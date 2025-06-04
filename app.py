@@ -23,6 +23,28 @@ The U.S. Dollar Index (DXY) measures the value of the United States dollar relat
 This interactive chart allows you to explore historical DXY data with zoom and pan functionality.
 """)
 
+@st.cache_data
+def get_presidential_data():
+    """
+    Get US Presidential terms data with party affiliations
+    """
+    presidents = [
+        {"name": "Jimmy Carter", "party": "Democrat", "start": "1977-01-20", "end": "1981-01-20"},
+        {"name": "Ronald Reagan", "party": "Republican", "start": "1981-01-20", "end": "1989-01-20"},
+        {"name": "George H.W. Bush", "party": "Republican", "start": "1989-01-20", "end": "1993-01-20"},
+        {"name": "Bill Clinton", "party": "Democrat", "start": "1993-01-20", "end": "2001-01-20"},
+        {"name": "George W. Bush", "party": "Republican", "start": "2001-01-20", "end": "2009-01-20"},
+        {"name": "Barack Obama", "party": "Democrat", "start": "2009-01-20", "end": "2017-01-20"},
+        {"name": "Donald Trump", "party": "Republican", "start": "2017-01-20", "end": "2021-01-20"},
+        {"name": "Joe Biden", "party": "Democrat", "start": "2021-01-20", "end": "2029-01-20"},  # Projected end
+    ]
+    
+    df = pd.DataFrame(presidents)
+    df['start'] = pd.to_datetime(df['start'])
+    df['end'] = pd.to_datetime(df['end'])
+    
+    return df
+
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def fetch_dxy_data(period="5y"):
     """
@@ -68,7 +90,7 @@ def calculate_statistics(data):
     
     return stats
 
-def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
+def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_presidents=False):
     """
     Create an interactive Plotly chart with zoom and pan functionality
     """
@@ -76,6 +98,56 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
         return None
     
     fig = go.Figure()
+    
+    # Add presidential background overlays if requested
+    if show_presidents:
+        presidents_df = get_presidential_data()
+        data_start = pd.Timestamp(data.index.min())
+        data_end = pd.Timestamp(data.index.max())
+        
+        # Filter presidents to only those within the data range
+        relevant_presidents = presidents_df[
+            (presidents_df['end'] >= data_start) & 
+            (presidents_df['start'] <= data_end)
+        ].copy()
+        
+        # Add background shapes for each presidency
+        for _, president in relevant_presidents.iterrows():
+            color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
+            
+            # Adjust start and end dates to data range
+            pres_start = pd.Timestamp(president['start'])
+            pres_end = pd.Timestamp(president['end'])
+            shape_start = max(pres_start, data_start)
+            shape_end = min(pres_end, data_end)
+            
+            fig.add_shape(
+                type="rect",
+                x0=shape_start,
+                x1=shape_end,
+                y0=0,
+                y1=1,
+                yref="paper",
+                fillcolor=color,
+                line=dict(width=0),
+                layer="below"
+            )
+            
+            # Add annotation for president name
+            mid_date = shape_start + pd.Timedelta(days=(shape_end - shape_start).days / 2)
+            term_duration = (shape_end - shape_start).days
+            if term_duration > 180:  # Only show name if term is long enough
+                fig.add_annotation(
+                    x=mid_date,
+                    y=0.95,
+                    yref="paper",
+                    text=f"{president['name']}<br>({president['party'][0]})",
+                    showarrow=False,
+                    font=dict(size=10, color='black'),
+                    bgcolor='rgba(255,255,255,0.8)',
+                    bordercolor='black',
+                    borderwidth=1
+                )
     
     # Add the main price line
     fig.add_trace(go.Scatter(
@@ -98,6 +170,54 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
             subplot_titles=('Dollar Index Price', 'Volume'),
             row_heights=[0.7, 0.3]
         )
+        
+        # Re-add presidential overlays for subplot
+        if show_presidents:
+            presidents_df = get_presidential_data()
+            data_start = data.index.min()
+            data_end = data.index.max()
+            
+            relevant_presidents = presidents_df[
+                (presidents_df['end'] >= data_start) & 
+                (presidents_df['start'] <= data_end)
+            ].copy()
+            
+            for _, president in relevant_presidents.iterrows():
+                color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
+                
+                shape_start = max(president['start'], data_start)
+                shape_end = min(president['end'], data_end)
+                
+                # Add shapes for both subplots
+                for row in [1, 2]:
+                    fig.add_shape(
+                        type="rect",
+                        x0=shape_start,
+                        x1=shape_end,
+                        y0=0,
+                        y1=1,
+                        yref=f"y{row} domain",
+                        fillcolor=color,
+                        line=dict(width=0),
+                        layer="below",
+                        row=row, col=1
+                    )
+                
+                # Add annotation for president name (only on main chart)
+                mid_date = shape_start + (shape_end - shape_start) / 2
+                if (shape_end - shape_start).days > 180:
+                    fig.add_annotation(
+                        x=mid_date,
+                        y=0.95,
+                        yref="y domain",
+                        text=f"{president['name']}<br>({president['party'][0]})",
+                        showarrow=False,
+                        font=dict(size=10, color='black'),
+                        bgcolor='rgba(255,255,255,0.8)',
+                        bordercolor='black',
+                        borderwidth=1,
+                        row=1, col=1
+                    )
         
         # Add price trace
         fig.add_trace(go.Scatter(
