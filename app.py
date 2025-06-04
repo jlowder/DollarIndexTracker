@@ -102,24 +102,20 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
     # Add presidential background overlays if requested
     if show_presidents:
         presidents_df = get_presidential_data()
-        data_start = pd.Timestamp(data.index.min())
-        data_end = pd.Timestamp(data.index.max())
+        data_start = data.index.min()
+        data_end = data.index.max()
         
-        # Filter presidents to only those within the data range
-        relevant_presidents = presidents_df[
-            (presidents_df['end'] >= data_start) & 
-            (presidents_df['start'] <= data_end)
-        ].copy()
-        
-        # Add background shapes for each presidency
-        for _, president in relevant_presidents.iterrows():
+        # Add background shapes for each presidency within data range
+        for _, president in presidents_df.iterrows():
+            # Skip if president term doesn't overlap with data
+            if president['end'] < data_start or president['start'] > data_end:
+                continue
+                
             color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
             
-            # Adjust start and end dates to data range
-            pres_start = pd.Timestamp(president['start'])
-            pres_end = pd.Timestamp(president['end'])
-            shape_start = max(pres_start, data_start)
-            shape_end = min(pres_end, data_end)
+            # Clip dates to data range
+            shape_start = president['start'] if president['start'] > data_start else data_start
+            shape_end = president['end'] if president['end'] < data_end else data_end
             
             fig.add_shape(
                 type="rect",
@@ -133,21 +129,28 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 layer="below"
             )
             
-            # Add annotation for president name
-            mid_date = shape_start + pd.Timedelta(days=(shape_end - shape_start).days / 2)
-            term_duration = (shape_end - shape_start).days
-            if term_duration > 180:  # Only show name if term is long enough
-                fig.add_annotation(
-                    x=mid_date,
-                    y=0.95,
-                    yref="paper",
-                    text=f"{president['name']}<br>({president['party'][0]})",
-                    showarrow=False,
-                    font=dict(size=10, color='black'),
-                    bgcolor='rgba(255,255,255,0.8)',
-                    bordercolor='black',
-                    borderwidth=1
-                )
+            # Add annotation for president name (simplified approach)
+            try:
+                # Calculate duration in a simpler way
+                start_ts = pd.to_datetime(shape_start)
+                end_ts = pd.to_datetime(shape_end)
+                duration_days = (end_ts - start_ts).days
+                
+                if duration_days > 180:  # Only show name if visible period is long enough
+                    mid_ts = start_ts + pd.Timedelta(days=duration_days/2)
+                    fig.add_annotation(
+                        x=mid_ts,
+                        y=0.95,
+                        yref="paper",
+                        text=f"{president['name']}<br>({president['party'][0]})",
+                        showarrow=False,
+                        font=dict(size=10, color='black'),
+                        bgcolor='rgba(255,255,255,0.8)',
+                        bordercolor='black',
+                        borderwidth=1
+                    )
+            except Exception:
+                pass  # Skip annotation if there are date calculation issues
     
     # Add the main price line
     fig.add_trace(go.Scatter(
@@ -177,16 +180,15 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
             data_start = data.index.min()
             data_end = data.index.max()
             
-            relevant_presidents = presidents_df[
-                (presidents_df['end'] >= data_start) & 
-                (presidents_df['start'] <= data_end)
-            ].copy()
-            
-            for _, president in relevant_presidents.iterrows():
+            for _, president in presidents_df.iterrows():
+                # Skip if president term doesn't overlap with data
+                if president['end'] < data_start or president['start'] > data_end:
+                    continue
+                    
                 color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                 
-                shape_start = max(president['start'], data_start)
-                shape_end = min(president['end'], data_end)
+                shape_start = president['start'] if president['start'] > data_start else data_start
+                shape_end = president['end'] if president['end'] < data_end else data_end
                 
                 # Add shapes for both subplots
                 for row in [1, 2]:
@@ -201,22 +203,6 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                         line=dict(width=0),
                         layer="below",
                         row=row, col=1
-                    )
-                
-                # Add annotation for president name (only on main chart)
-                mid_date = shape_start + (shape_end - shape_start) / 2
-                if (shape_end - shape_start).days > 180:
-                    fig.add_annotation(
-                        x=mid_date,
-                        y=0.95,
-                        yref="y domain",
-                        text=f"{president['name']}<br>({president['party'][0]})",
-                        showarrow=False,
-                        font=dict(size=10, color='black'),
-                        bgcolor='rgba(255,255,255,0.8)',
-                        bordercolor='black',
-                        borderwidth=1,
-                        row=1, col=1
                     )
         
         # Add price trace
@@ -336,6 +322,15 @@ selected_period_label = st.sidebar.selectbox(
 
 selected_period = period_options[selected_period_label]
 
+# Presidential overlay option
+show_presidential_overlay = st.sidebar.checkbox("Show Presidential Terms", value=False)
+if show_presidential_overlay:
+    st.sidebar.markdown("""
+    **Legend:**
+    - 🔵 Blue: Democrat
+    - 🔴 Red: Republican
+    """)
+
 # Auto-refresh option
 auto_refresh = st.sidebar.checkbox("Auto-refresh data (every 5 minutes)", value=False)
 
@@ -389,7 +384,7 @@ if data is not None:
             )
     
     # Create and display the interactive chart
-    fig = create_interactive_chart(data, f"U.S. Dollar Index (DXY) - {selected_period_label}")
+    fig = create_interactive_chart(data, f"U.S. Dollar Index (DXY) - {selected_period_label}", show_presidential_overlay)
     
     if fig:
         st.plotly_chart(fig, use_container_width=True)
