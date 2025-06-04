@@ -28,7 +28,7 @@ An interactive Streamlit web application for visualizing U.S. Dollar Index data 
 docker-compose up -d
 ```
 
-3. Access the application at `http://your-server-ip:5000`
+3. Access the application at `http://your-server-ip:8501`
 
 ### Option 2: Using Docker directly
 
@@ -41,10 +41,10 @@ docker build -t dxy-chart .
 2. Run the container:
 
 ```bash
-docker run -d -p 5000:5000 --name dxy-app dxy-chart
+docker run -d -p 8501:5000 --name dxy-app dxy-chart
 ```
 
-3. Access the application at `http://your-server-ip:5000`
+3. Access the application at `http://your-server-ip:8501`
 
 ### Configuration
 
