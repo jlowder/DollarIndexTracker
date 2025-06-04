@@ -111,9 +111,13 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
         
         for _, president in presidents_df.iterrows():
             try:
-                # Convert presidential dates to string format for comparison
-                pres_start_str = pd.Timestamp(president['start']).strftime('%Y-%m-%d')
-                pres_end_str = pd.Timestamp(president['end']).strftime('%Y-%m-%d')
+                # Get president dates as datetime objects first
+                pres_start = president['start']
+                pres_end = president['end']
+                
+                # Convert to string format for comparison
+                pres_start_str = pres_start.strftime('%Y-%m-%d')
+                pres_end_str = pres_end.strftime('%Y-%m-%d')
                 
                 # Check if president term overlaps with data range using string comparison
                 if pres_end_str < data_start_str or pres_start_str > data_end_str:
@@ -121,9 +125,9 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 
                 color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                 
-                # Use original datetime objects for plotting
-                clip_start = president['start']
-                clip_end = president['end']
+                # Use original datetime objects for plotting, but clip to data range
+                clip_start = pres_start
+                clip_end = pres_end
                 
                 # Clip to actual data range if needed
                 if pres_start_str < data_start_str:
@@ -145,9 +149,9 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 
                 # Add annotation for president name
                 try:
-                    duration = pd.Timestamp(clip_end) - pd.Timestamp(clip_start)
-                    if duration.days > 365:
-                        mid_date = pd.Timestamp(clip_start) + duration / 2
+                    duration = clip_end - clip_start
+                    if hasattr(duration, 'days') and duration.days > 365:
+                        mid_date = clip_start + duration / 2
                         fig.add_annotation(
                             x=mid_date,
                             y=0.95,
@@ -197,9 +201,13 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
             
             for _, president in presidents_df.iterrows():
                 try:
-                    # Convert presidential dates to string format for comparison
-                    pres_start_str = pd.Timestamp(president['start']).strftime('%Y-%m-%d')
-                    pres_end_str = pd.Timestamp(president['end']).strftime('%Y-%m-%d')
+                    # Get president dates as datetime objects first
+                    pres_start = president['start']
+                    pres_end = president['end']
+                    
+                    # Convert to string format for comparison
+                    pres_start_str = pres_start.strftime('%Y-%m-%d')
+                    pres_end_str = pres_end.strftime('%Y-%m-%d')
                     
                     # Check if president term overlaps with data range using string comparison
                     if pres_end_str < data_start_str or pres_start_str > data_end_str:
@@ -207,9 +215,9 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                     
                     color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                     
-                    # Use original datetime objects for plotting
-                    clip_start = president['start']
-                    clip_end = president['end']
+                    # Use original datetime objects for plotting, but clip to data range
+                    clip_start = pres_start
+                    clip_end = pres_end
                     
                     # Clip to actual data range if needed
                     if pres_start_str < data_start_str:
