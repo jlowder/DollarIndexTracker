@@ -107,11 +107,21 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
         # Add background shapes for each presidency within data range
         for _, president in presidents_df.iterrows():
             try:
-                # Convert to pandas timestamps for consistent comparison
-                pres_start = pd.Timestamp(president['start']).tz_localize(None)
-                pres_end = pd.Timestamp(president['end']).tz_localize(None)
-                data_start = pd.Timestamp(data.index.min()).tz_localize(None)
-                data_end = pd.Timestamp(data.index.max()).tz_localize(None)
+                # Handle timezone-aware vs timezone-naive datetime comparison
+                pres_start = president['start']
+                pres_end = president['end']
+                data_start = data.index.min()
+                data_end = data.index.max()
+                
+                # Convert to timezone-naive if needed
+                if hasattr(data_start, 'tz_localize'):
+                    if data_start.tz is not None:
+                        data_start = data_start.tz_localize(None)
+                        data_end = data_end.tz_localize(None)
+                if hasattr(pres_start, 'tz_localize'):
+                    if pres_start.tz is not None:
+                        pres_start = pres_start.tz_localize(None)
+                        pres_end = pres_end.tz_localize(None)
                 
                 # Skip if president term doesn't overlap with data
                 if pres_end < data_start or pres_start > data_end:
@@ -137,7 +147,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 
                 # Add annotation for president name
                 duration = shape_end - shape_start
-                if duration.days > 180:
+                if hasattr(duration, 'days') and duration.days > 180:
                     mid_date = shape_start + duration / 2
                     fig.add_annotation(
                         x=mid_date,
@@ -150,7 +160,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                         bordercolor='black',
                         borderwidth=1
                     )
-            except Exception:
+            except Exception as e:
                 continue  # Skip this president if there are date comparison issues
     
     # Add the main price line
@@ -165,8 +175,9 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                       '<extra></extra>'
     ))
     
-    # Add volume as a secondary subplot if available
-    if 'Volume' in data.columns and data['Volume'].sum() > 0:
+    # Add volume as a secondary subplot if available and has meaningful data
+    has_volume = 'Volume' in data.columns and data['Volume'].sum() > 0 and data['Volume'].max() > 1000
+    if has_volume:
         fig = make_subplots(
             rows=2, cols=1,
             shared_xaxes=True,
@@ -181,11 +192,21 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
             
             for _, president in presidents_df.iterrows():
                 try:
-                    # Convert to pandas timestamps for consistent comparison
-                    pres_start = pd.Timestamp(president['start']).tz_localize(None)
-                    pres_end = pd.Timestamp(president['end']).tz_localize(None)
-                    data_start = pd.Timestamp(data.index.min()).tz_localize(None)
-                    data_end = pd.Timestamp(data.index.max()).tz_localize(None)
+                    # Handle timezone-aware vs timezone-naive datetime comparison
+                    pres_start = president['start']
+                    pres_end = president['end']
+                    data_start = data.index.min()
+                    data_end = data.index.max()
+                    
+                    # Convert to timezone-naive if needed
+                    if hasattr(data_start, 'tz_localize'):
+                        if data_start.tz is not None:
+                            data_start = data_start.tz_localize(None)
+                            data_end = data_end.tz_localize(None)
+                    if hasattr(pres_start, 'tz_localize'):
+                        if pres_start.tz is not None:
+                            pres_start = pres_start.tz_localize(None)
+                            pres_end = pres_end.tz_localize(None)
                     
                     # Skip if president term doesn't overlap with data
                     if pres_end < data_start or pres_start > data_end:
