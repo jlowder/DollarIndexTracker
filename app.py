@@ -221,10 +221,17 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
             
             # Get data date range - handle timezone properly
             try:
-                data_start = data.index.min()
-                data_end = data.index.max()
+                data_start_raw = data.index.min()
+                data_end_raw = data.index.max()
                 
-                # Convert timezone-aware timestamps to timezone-naive for comparison
+                # Store original for plotting
+                data_start_plot = data_start_raw
+                data_end_plot = data_end_raw
+                
+                # Convert to timezone-naive for comparison
+                data_start = data_start_raw
+                data_end = data_end_raw
+                
                 if hasattr(data_start, 'tz') and data_start.tz is not None:
                     data_start = data_start.tz_convert('UTC').tz_localize(None)
                 if hasattr(data_end, 'tz') and data_end.tz is not None:
@@ -249,9 +256,15 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                         
                         color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                         
-                        # Clip presidential term to actual data range
-                        clip_start = max(pres_start, data_start)
-                        clip_end = min(pres_end, data_end)
+                        # Clip presidential term to actual data range using original data timestamps
+                        clip_start = pres_start
+                        clip_end = pres_end
+                        
+                        # Clip to data range using original timezone-aware timestamps for plotting
+                        if pres_start < data_start:
+                            clip_start = data_start_plot
+                        if pres_end > data_end:
+                            clip_end = data_end_plot
                         
                         # Add shapes for both subplots
                         for row in [1, 2]:
