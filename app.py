@@ -107,10 +107,17 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
         
         # Get data date range - handle timezone properly
         try:
-            data_start = data.index.min()
-            data_end = data.index.max()
+            data_start_raw = data.index.min()
+            data_end_raw = data.index.max()
             
-            # Convert timezone-aware timestamps to timezone-naive for comparison
+            # Store original for plotting
+            data_start_plot = data_start_raw
+            data_end_plot = data_end_raw
+            
+            # Convert to timezone-naive for comparison
+            data_start = data_start_raw
+            data_end = data_end_raw
+            
             if hasattr(data_start, 'tz') and data_start.tz is not None:
                 data_start = data_start.tz_convert('UTC').tz_localize(None)
             if hasattr(data_end, 'tz') and data_end.tz is not None:
@@ -136,9 +143,15 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 
                 color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                 
-                # Clip presidential term to actual data range
-                clip_start = max(pres_start, data_start)
-                clip_end = min(pres_end, data_end)
+                # Clip presidential term to actual data range using original data timestamps
+                clip_start = pres_start
+                clip_end = pres_end
+                
+                # Clip to data range using original timezone-aware timestamps for plotting
+                if pres_start < data_start:
+                    clip_start = data_start_plot
+                if pres_end > data_end:
+                    clip_end = data_end_plot
                 
                 fig.add_shape(
                     type="rect",
@@ -156,9 +169,13 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 
                 # Add annotation for president name
                 try:
-                    duration = clip_end - clip_start
+                    # Calculate duration using timezone-naive timestamps
+                    duration_start = pres_start if pres_start >= data_start else data_start
+                    duration_end = pres_end if pres_end <= data_end else data_end
+                    duration = duration_end - duration_start
+                    
                     if duration.days > 365:
-                        mid_date = clip_start + duration / 2
+                        mid_date = duration_start + duration / 2
                         fig.add_annotation(
                             x=mid_date,
                             y=0.95,
@@ -430,6 +447,10 @@ if data is not None:
                 value=f"{stats['low_52w']:.2f}",
                 delta=None
             )
+    
+    # Debug info for All Time period
+    if selected_period_label == "All Time" and show_presidential_overlay:
+        st.sidebar.info(f"Debug: Data range {data.index.min()} to {data.index.max()}")
     
     # Create and display the interactive chart
     fig = create_interactive_chart(data, f"U.S. Dollar Index (DXY) - {selected_period_label}", show_presidential_overlay)
