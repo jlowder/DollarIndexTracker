@@ -153,6 +153,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 if pres_end > data_end:
                     clip_end = data_end_plot
                 
+                # Force add shape for debugging
                 fig.add_shape(
                     type="rect",
                     x0=clip_start,
@@ -463,7 +464,26 @@ if data is not None:
     
     # Debug info for All Time period
     if selected_period_label == "All Time" and show_presidential_overlay:
+        presidents_df = get_presidential_data()
         st.sidebar.info(f"Debug: Data range {data.index.min()} to {data.index.max()}")
+        st.sidebar.info(f"Debug: Presidents data loaded: {len(presidents_df)} presidents")
+        
+        # Check if any presidents should overlap
+        data_start = data.index.min()
+        data_end = data.index.max()
+        if hasattr(data_start, 'tz') and data_start.tz:
+            data_start = data_start.tz_convert('UTC').tz_localize(None)
+        if hasattr(data_end, 'tz') and data_end.tz:
+            data_end = data_end.tz_convert('UTC').tz_localize(None)
+        
+        overlapping_presidents = []
+        for _, president in presidents_df.iterrows():
+            pres_start = pd.Timestamp(president['start'])
+            pres_end = pd.Timestamp(president['end'])
+            if not (pres_end < data_start or pres_start > data_end):
+                overlapping_presidents.append(president['name'])
+        
+        st.sidebar.info(f"Debug: Overlapping presidents: {overlapping_presidents}")
     
     # Create and display the interactive chart
     fig = create_interactive_chart(data, f"U.S. Dollar Index (DXY) - {selected_period_label}", show_presidential_overlay)
