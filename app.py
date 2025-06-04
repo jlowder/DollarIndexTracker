@@ -127,7 +127,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
         title=dict(
             text=title,
             x=0.5,
-            font=dict(size=20)
+            font=dict(size=20, color='black', family='Arial Black')
         ),
         xaxis_title="Date",
         yaxis_title="Dollar Index Value",
@@ -137,12 +137,20 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
         margin=dict(l=50, r=50, t=80, b=50),
         plot_bgcolor='white',
         paper_bgcolor='white',
+        font=dict(color='black', size=12),  # Global font color and size
+        legend=dict(
+            font=dict(color='black', size=12),
+            bgcolor='rgba(255,255,255,0.8)',
+            bordercolor='black',
+            borderwidth=1
+        ),
         xaxis=dict(
             showgrid=True,
             gridcolor='lightgray',
             rangeslider=dict(visible=False),  # Disable range slider for cleaner look
             type='date',
             title=dict(
+                text="Date",
                 font=dict(color='black', size=14, family='Arial Black')
             ),
             tickfont=dict(color='black', size=12)
@@ -151,6 +159,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
             showgrid=True,
             gridcolor='lightgray',
             title=dict(
+                text="Dollar Index Value",
                 font=dict(color='black', size=14, family='Arial Black')
             ),
             tickfont=dict(color='black', size=12)
@@ -172,7 +181,12 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
                 x=0,
                 y=1.02,
                 xanchor="left",
-                yanchor="top"
+                yanchor="top",
+                font=dict(color='black', size=12),
+                bgcolor='rgba(255,255,255,0.9)',
+                bordercolor='black',
+                borderwidth=1,
+                activecolor='lightblue'
             ),
         )
     )
@@ -300,7 +314,6 @@ if data is not None:
         with st.expander("📊 View Raw Data"):
             # Show last 50 rows by default
             display_data = data.tail(50).copy()
-            display_data.index = display_data.index.strftime('%Y-%m-%d')
             st.dataframe(
                 display_data[['Open', 'High', 'Low', 'Close', 'Volume']].round(2),
                 use_container_width=True
