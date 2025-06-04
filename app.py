@@ -105,10 +105,25 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
     if show_presidents:
         presidents_df = get_presidential_data()
         
-        # Get data date range as pandas Timestamps for proper comparison
-        data_start = pd.Timestamp(data.index.min()).tz_localize(None) if hasattr(data.index.min(), 'tz') and data.index.min().tz else pd.Timestamp(data.index.min())
-        data_end = pd.Timestamp(data.index.max()).tz_localize(None) if hasattr(data.index.max(), 'tz') and data.index.max().tz else pd.Timestamp(data.index.max())
+        # Get data date range - handle timezone properly
+        try:
+            data_start = data.index.min()
+            data_end = data.index.max()
+            
+            # Convert timezone-aware timestamps to timezone-naive for comparison
+            if hasattr(data_start, 'tz') and data_start.tz is not None:
+                data_start = data_start.tz_convert('UTC').tz_localize(None)
+            if hasattr(data_end, 'tz') and data_end.tz is not None:
+                data_end = data_end.tz_convert('UTC').tz_localize(None)
+                
+            # Ensure they're pandas Timestamps
+            data_start = pd.Timestamp(data_start)
+            data_end = pd.Timestamp(data_end)
+        except Exception as e:
+            # Fallback if timestamp conversion fails
+            return fig
         
+        presidents_added = 0
         for _, president in presidents_df.iterrows():
             try:
                 # Get president dates as pandas Timestamps
@@ -136,6 +151,8 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                     line=dict(width=0),
                     layer="below"
                 )
+                
+                presidents_added += 1
                 
                 # Add annotation for president name
                 try:
@@ -185,42 +202,56 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
         if show_presidents:
             presidents_df = get_presidential_data()
             
-            # Get data date range as pandas Timestamps for proper comparison
-            data_start = pd.Timestamp(data.index.min()).tz_localize(None) if hasattr(data.index.min(), 'tz') and data.index.min().tz else pd.Timestamp(data.index.min())
-            data_end = pd.Timestamp(data.index.max()).tz_localize(None) if hasattr(data.index.max(), 'tz') and data.index.max().tz else pd.Timestamp(data.index.max())
-            
-            for _, president in presidents_df.iterrows():
-                try:
-                    # Get president dates as pandas Timestamps
-                    pres_start = pd.Timestamp(president['start'])
-                    pres_end = pd.Timestamp(president['end'])
+            # Get data date range - handle timezone properly
+            try:
+                data_start = data.index.min()
+                data_end = data.index.max()
+                
+                # Convert timezone-aware timestamps to timezone-naive for comparison
+                if hasattr(data_start, 'tz') and data_start.tz is not None:
+                    data_start = data_start.tz_convert('UTC').tz_localize(None)
+                if hasattr(data_end, 'tz') and data_end.tz is not None:
+                    data_end = data_end.tz_convert('UTC').tz_localize(None)
                     
-                    # Check if president term overlaps with data range
-                    if pres_end < data_start or pres_start > data_end:
-                        continue
-                    
-                    color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
-                    
-                    # Clip presidential term to actual data range
-                    clip_start = max(pres_start, data_start)
-                    clip_end = min(pres_end, data_end)
-                    
-                    # Add shapes for both subplots
-                    for row in [1, 2]:
-                        fig.add_shape(
-                            type="rect",
-                            x0=clip_start,
-                            x1=clip_end,
-                            y0=0,
-                            y1=1,
-                            yref=f"y{row} domain",
-                            fillcolor=color,
-                            line=dict(width=0),
-                            layer="below",
-                            row=row, col=1
-                        )
-                except Exception:
-                    continue  # Skip this president if there are issues
+                # Ensure they're pandas Timestamps
+                data_start = pd.Timestamp(data_start)
+                data_end = pd.Timestamp(data_end)
+            except Exception as e:
+                # Skip presidential overlays if timestamp conversion fails
+                pass
+            else:
+                for _, president in presidents_df.iterrows():
+                    try:
+                        # Get president dates as pandas Timestamps
+                        pres_start = pd.Timestamp(president['start'])
+                        pres_end = pd.Timestamp(president['end'])
+                        
+                        # Check if president term overlaps with data range
+                        if pres_end < data_start or pres_start > data_end:
+                            continue
+                        
+                        color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
+                        
+                        # Clip presidential term to actual data range
+                        clip_start = max(pres_start, data_start)
+                        clip_end = min(pres_end, data_end)
+                        
+                        # Add shapes for both subplots
+                        for row in [1, 2]:
+                            fig.add_shape(
+                                type="rect",
+                                x0=clip_start,
+                                x1=clip_end,
+                                y0=0,
+                                y1=1,
+                                yref=f"y{row} domain",
+                                fillcolor=color,
+                                line=dict(width=0),
+                                layer="below",
+                                row=row, col=1
+                            )
+                    except Exception:
+                        continue  # Skip this president if there are issues
         
         # Add price trace
         fig.add_trace(go.Scatter(
