@@ -206,7 +206,11 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
     ))
     
     # Check if we need volume subplot first, before adding presidential overlays
-    has_volume = 'Volume' in data.columns and data['Volume'].sum() > 0 and data['Volume'].max() > 1000
+    # For DXY, volume data is often unreliable or empty for long historical periods
+    has_volume = ('Volume' in data.columns and 
+                  data['Volume'].sum() > 0 and 
+                  data['Volume'].max() > 1000 and
+                  (data['Volume'] > 1000).sum() > len(data) * 0.1)  # At least 10% of data should have meaningful volume
     
     if has_volume:
         # Create subplot figure from the start
