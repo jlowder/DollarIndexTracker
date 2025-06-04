@@ -285,13 +285,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                             )
                     except Exception:
                         continue  # Skip this president if there are issues
-    else:
-        # Single chart - presidential overlays already added above
-        pass
-        
-
-        
-        # Add price trace
+        # Add price trace to subplot
         fig.add_trace(go.Scatter(
             x=data.index,
             y=data['Close'],
@@ -303,7 +297,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                           '<extra></extra>'
         ), row=1, col=1)
         
-        # Add volume trace
+        # Add volume trace to subplot
         fig.add_trace(go.Bar(
             x=data.index,
             y=data['Volume'],
@@ -313,6 +307,20 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                           '<b>Volume:</b> %{y:,.0f}<br>' +
                           '<extra></extra>'
         ), row=2, col=1)
+    else:
+        # Single chart - presidential overlays already added above
+        # Add price trace to single chart
+        fig.add_trace(go.Scatter(
+            x=data.index,
+            y=data['Close'],
+            mode='lines',
+            name='DXY Close',
+            line=dict(color='#2E86AB', width=2),
+            hovertemplate='<b>Date:</b> %{x}<br>' +
+                          '<b>Price:</b> %{y:.2f}<br>' +
+                          '<extra></extra>'
+        ))
+
     
     # Update layout for better interactivity
     fig.update_layout(
