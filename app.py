@@ -141,11 +141,19 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)"):
             showgrid=True,
             gridcolor='lightgray',
             rangeslider=dict(visible=False),  # Disable range slider for cleaner look
-            type='date'
+            type='date',
+            title=dict(
+                font=dict(color='black', size=14, family='Arial Black')
+            ),
+            tickfont=dict(color='black', size=12)
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor='lightgray'
+            gridcolor='lightgray',
+            title=dict(
+                font=dict(color='black', size=14, family='Arial Black')
+            ),
+            tickfont=dict(color='black', size=12)
         )
     )
     
