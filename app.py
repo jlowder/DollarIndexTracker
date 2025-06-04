@@ -29,6 +29,7 @@ def get_presidential_data():
     Get US Presidential terms data with party affiliations
     """
     presidents = [
+        {"name": "Richard Nixon", "party": "Republican", "start": "1969-01-20", "end": "1974-08-09"},
         {"name": "Gerald Ford", "party": "Republican", "start": "1974-08-09", "end": "1977-01-20"},
         {"name": "Jimmy Carter", "party": "Democrat", "start": "1977-01-20", "end": "1981-01-20"},
         {"name": "Ronald Reagan", "party": "Republican", "start": "1981-01-20", "end": "1989-01-20"},
