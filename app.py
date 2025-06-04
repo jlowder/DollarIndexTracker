@@ -29,6 +29,7 @@ def get_presidential_data():
     Get US Presidential terms data with party affiliations
     """
     presidents = [
+        {"name": "Gerald Ford", "party": "Republican", "start": "1974-08-09", "end": "1977-01-20"},
         {"name": "Jimmy Carter", "party": "Democrat", "start": "1977-01-20", "end": "1981-01-20"},
         {"name": "Ronald Reagan", "party": "Republican", "start": "1981-01-20", "end": "1989-01-20"},
         {"name": "George H.W. Bush", "party": "Republican", "start": "1989-01-20", "end": "1993-01-20"},
@@ -104,34 +105,36 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
     if show_presidents:
         presidents_df = get_presidential_data()
         
+        # Get data range as simple datetime objects
+        try:
+            data_start = pd.Timestamp(data.index.min())
+            data_end = pd.Timestamp(data.index.max())
+            
+            # Ensure timezone-naive for comparison
+            if data_start.tz is not None:
+                data_start = data_start.tz_convert('UTC').tz_localize(None)
+            if data_end.tz is not None:
+                data_end = data_end.tz_convert('UTC').tz_localize(None)
+        except:
+            # Fallback to simple conversion
+            data_start = pd.Timestamp(str(data.index.min())[:10])
+            data_end = pd.Timestamp(str(data.index.max())[:10])
+        
         # Add background shapes for each presidency within data range
         for _, president in presidents_df.iterrows():
             try:
-                # Handle timezone-aware vs timezone-naive datetime comparison
                 pres_start = president['start']
                 pres_end = president['end']
-                data_start = data.index.min()
-                data_end = data.index.max()
                 
-                # Convert to timezone-naive if needed
-                if hasattr(data_start, 'tz_localize'):
-                    if data_start.tz is not None:
-                        data_start = data_start.tz_localize(None)
-                        data_end = data_end.tz_localize(None)
-                if hasattr(pres_start, 'tz_localize'):
-                    if pres_start.tz is not None:
-                        pres_start = pres_start.tz_localize(None)
-                        pres_end = pres_end.tz_localize(None)
-                
-                # Skip if president term doesn't overlap with data
+                # Skip if president term doesn't overlap with data (using string comparison as fallback)
                 if pres_end < data_start or pres_start > data_end:
                     continue
                     
                 color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                 
-                # Clip dates to data range
-                shape_start = max(pres_start, data_start)
-                shape_end = min(pres_end, data_end)
+                # Use the original data index values for plotting to avoid timezone issues
+                shape_start = pres_start if pres_start > data_start else data.index[0]
+                shape_end = pres_end if pres_end < data_end else data.index[-1]
                 
                 fig.add_shape(
                     type="rect",
@@ -146,22 +149,25 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 )
                 
                 # Add annotation for president name
-                duration = shape_end - shape_start
-                if hasattr(duration, 'days') and duration.days > 180:
-                    mid_date = shape_start + duration / 2
-                    fig.add_annotation(
-                        x=mid_date,
-                        y=0.95,
-                        yref="paper",
-                        text=f"{president['name']}<br>({president['party'][0]})",
-                        showarrow=False,
-                        font=dict(size=10, color='black'),
-                        bgcolor='rgba(255,255,255,0.8)',
-                        bordercolor='black',
-                        borderwidth=1
-                    )
-            except Exception as e:
-                continue  # Skip this president if there are date comparison issues
+                try:
+                    duration = shape_end - shape_start
+                    if duration.days > 180:
+                        mid_date = shape_start + pd.Timedelta(days=duration.days//2)
+                        fig.add_annotation(
+                            x=mid_date,
+                            y=0.95,
+                            yref="paper",
+                            text=f"{president['name']}<br>({president['party'][0]})",
+                            showarrow=False,
+                            font=dict(size=10, color='black'),
+                            bgcolor='rgba(255,255,255,0.8)',
+                            bordercolor='black',
+                            borderwidth=1
+                        )
+                except:
+                    pass  # Skip annotation if duration calculation fails
+            except Exception:
+                continue  # Skip this president if there are any issues
     
     # Add the main price line
     fig.add_trace(go.Scatter(
