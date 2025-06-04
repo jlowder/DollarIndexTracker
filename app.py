@@ -36,7 +36,8 @@ def get_presidential_data():
         {"name": "George W. Bush", "party": "Republican", "start": "2001-01-20", "end": "2009-01-20"},
         {"name": "Barack Obama", "party": "Democrat", "start": "2009-01-20", "end": "2017-01-20"},
         {"name": "Donald Trump", "party": "Republican", "start": "2017-01-20", "end": "2021-01-20"},
-        {"name": "Joe Biden", "party": "Democrat", "start": "2021-01-20", "end": "2029-01-20"},  # Projected end
+        {"name": "Joe Biden", "party": "Democrat", "start": "2021-01-20", "end": "2025-01-20"},
+        {"name": "Donald Trump", "party": "Republican", "start": "2025-01-20", "end": "2029-01-20"},  # Second term
     ]
     
     df = pd.DataFrame(presidents)
