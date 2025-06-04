@@ -105,15 +105,29 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
     if show_presidents:
         presidents_df = get_presidential_data()
         
-        # Simplified approach - always add all presidents and let Plotly handle clipping
+        # Get actual data range for clipping
+        data_start = data.index.min()
+        data_end = data.index.max()
+        
         for _, president in presidents_df.iterrows():
             try:
+                pres_start = president['start']
+                pres_end = president['end']
+                
+                # Only add if president term overlaps with data range
+                if pres_end < data_start or pres_start > data_end:
+                    continue
+                
+                # Clip presidential term to data range
+                clip_start = max(pres_start, data_start)
+                clip_end = min(pres_end, data_end)
+                
                 color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                 
                 fig.add_shape(
                     type="rect",
-                    x0=president['start'],
-                    x1=president['end'],
+                    x0=clip_start,
+                    x1=clip_end,
                     y0=0,
                     y1=1,
                     yref="paper",
@@ -122,20 +136,22 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                     layer="below"
                 )
                 
-                # Add annotation for president name
+                # Add annotation for president name if visible period is long enough
                 try:
-                    mid_date = president['start'] + (president['end'] - president['start']) / 2
-                    fig.add_annotation(
-                        x=mid_date,
-                        y=0.95,
-                        yref="paper",
-                        text=f"{president['name']}<br>({president['party'][0]})",
-                        showarrow=False,
-                        font=dict(size=10, color='black'),
-                        bgcolor='rgba(255,255,255,0.8)',
-                        bordercolor='black',
-                        borderwidth=1
-                    )
+                    duration = clip_end - clip_start
+                    if duration.days > 365:  # Only show label if more than 1 year visible
+                        mid_date = clip_start + duration / 2
+                        fig.add_annotation(
+                            x=mid_date,
+                            y=0.95,
+                            yref="paper",
+                            text=f"{president['name']}<br>({president['party'][0]})",
+                            showarrow=False,
+                            font=dict(size=10, color='black'),
+                            bgcolor='rgba(255,255,255,0.8)',
+                            bordercolor='black',
+                            borderwidth=1
+                        )
                 except:
                     pass  # Skip annotation if calculation fails
             except Exception:
@@ -168,16 +184,31 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
         if show_presidents:
             presidents_df = get_presidential_data()
             
+            # Get actual data range for clipping
+            data_start = data.index.min()
+            data_end = data.index.max()
+            
             for _, president in presidents_df.iterrows():
                 try:
+                    pres_start = president['start']
+                    pres_end = president['end']
+                    
+                    # Only add if president term overlaps with data range
+                    if pres_end < data_start or pres_start > data_end:
+                        continue
+                    
+                    # Clip presidential term to data range
+                    clip_start = max(pres_start, data_start)
+                    clip_end = min(pres_end, data_end)
+                    
                     color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                     
                     # Add shapes for both subplots
                     for row in [1, 2]:
                         fig.add_shape(
                             type="rect",
-                            x0=president['start'],
-                            x1=president['end'],
+                            x0=clip_start,
+                            x1=clip_end,
                             y0=0,
                             y1=1,
                             yref=f"y{row} domain",
