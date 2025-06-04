@@ -105,35 +105,25 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
     if show_presidents:
         presidents_df = get_presidential_data()
         
-        # Convert data range to strings for safe comparison
-        data_start_str = str(data.index.min())[:10]  # Get YYYY-MM-DD format
-        data_end_str = str(data.index.max())[:10]
+        # Get data date range as pandas Timestamps for proper comparison
+        data_start = pd.Timestamp(data.index.min()).tz_localize(None) if hasattr(data.index.min(), 'tz') and data.index.min().tz else pd.Timestamp(data.index.min())
+        data_end = pd.Timestamp(data.index.max()).tz_localize(None) if hasattr(data.index.max(), 'tz') and data.index.max().tz else pd.Timestamp(data.index.max())
         
         for _, president in presidents_df.iterrows():
             try:
-                # Get president dates as datetime objects first
-                pres_start = president['start']
-                pres_end = president['end']
+                # Get president dates as pandas Timestamps
+                pres_start = pd.Timestamp(president['start'])
+                pres_end = pd.Timestamp(president['end'])
                 
-                # Convert to string format for comparison
-                pres_start_str = pres_start.strftime('%Y-%m-%d')
-                pres_end_str = pres_end.strftime('%Y-%m-%d')
-                
-                # Check if president term overlaps with data range using string comparison
-                if pres_end_str < data_start_str or pres_start_str > data_end_str:
+                # Check if president term overlaps with data range
+                if pres_end < data_start or pres_start > data_end:
                     continue
                 
                 color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                 
-                # Use original datetime objects for plotting, but clip to data range
-                clip_start = pres_start
-                clip_end = pres_end
-                
-                # Clip to actual data range if needed
-                if pres_start_str < data_start_str:
-                    clip_start = data.index.min()
-                if pres_end_str > data_end_str:
-                    clip_end = data.index.max()
+                # Clip presidential term to actual data range
+                clip_start = max(pres_start, data_start)
+                clip_end = min(pres_end, data_end)
                 
                 fig.add_shape(
                     type="rect",
@@ -150,7 +140,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 # Add annotation for president name
                 try:
                     duration = clip_end - clip_start
-                    if hasattr(duration, 'days') and duration.days > 365:
+                    if duration.days > 365:
                         mid_date = clip_start + duration / 2
                         fig.add_annotation(
                             x=mid_date,
@@ -195,35 +185,25 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
         if show_presidents:
             presidents_df = get_presidential_data()
             
-            # Convert data range to strings for safe comparison
-            data_start_str = str(data.index.min())[:10]  # Get YYYY-MM-DD format
-            data_end_str = str(data.index.max())[:10]
+            # Get data date range as pandas Timestamps for proper comparison
+            data_start = pd.Timestamp(data.index.min()).tz_localize(None) if hasattr(data.index.min(), 'tz') and data.index.min().tz else pd.Timestamp(data.index.min())
+            data_end = pd.Timestamp(data.index.max()).tz_localize(None) if hasattr(data.index.max(), 'tz') and data.index.max().tz else pd.Timestamp(data.index.max())
             
             for _, president in presidents_df.iterrows():
                 try:
-                    # Get president dates as datetime objects first
-                    pres_start = president['start']
-                    pres_end = president['end']
+                    # Get president dates as pandas Timestamps
+                    pres_start = pd.Timestamp(president['start'])
+                    pres_end = pd.Timestamp(president['end'])
                     
-                    # Convert to string format for comparison
-                    pres_start_str = pres_start.strftime('%Y-%m-%d')
-                    pres_end_str = pres_end.strftime('%Y-%m-%d')
-                    
-                    # Check if president term overlaps with data range using string comparison
-                    if pres_end_str < data_start_str or pres_start_str > data_end_str:
+                    # Check if president term overlaps with data range
+                    if pres_end < data_start or pres_start > data_end:
                         continue
                     
                     color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                     
-                    # Use original datetime objects for plotting, but clip to data range
-                    clip_start = pres_start
-                    clip_end = pres_end
-                    
-                    # Clip to actual data range if needed
-                    if pres_start_str < data_start_str:
-                        clip_start = data.index.min()
-                    if pres_end_str > data_end_str:
-                        clip_end = data.index.max()
+                    # Clip presidential term to actual data range
+                    clip_start = max(pres_start, data_start)
+                    clip_end = min(pres_end, data_end)
                     
                     # Add shapes for both subplots
                     for row in [1, 2]:
