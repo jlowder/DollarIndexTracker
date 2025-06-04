@@ -205,9 +205,11 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                       '<extra></extra>'
     ))
     
-    # Add volume as a secondary subplot if available and has meaningful data
+    # Check if we need volume subplot first, before adding presidential overlays
     has_volume = 'Volume' in data.columns and data['Volume'].sum() > 0 and data['Volume'].max() > 1000
+    
     if has_volume:
+        # Create subplot figure from the start
         fig = make_subplots(
             rows=2, cols=1,
             shared_xaxes=True,
@@ -216,7 +218,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
             row_heights=[0.7, 0.3]
         )
         
-        # Re-add presidential overlays for subplot
+        # Add presidential overlays for subplot
         if show_presidents:
             presidents_df = get_presidential_data()
             
@@ -283,6 +285,11 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                             )
                     except Exception:
                         continue  # Skip this president if there are issues
+    else:
+        # Single chart - presidential overlays already added above
+        pass
+        
+
         
         # Add price trace
         fig.add_trace(go.Scatter(
