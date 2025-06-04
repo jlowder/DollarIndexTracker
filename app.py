@@ -141,7 +141,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 if pres_end < data_start or pres_start > data_end:
                     continue
                 
-                color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
+                color = 'rgba(0, 100, 200, 0.4)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.4)'
                 
                 # Clip presidential term to actual data range using original data timestamps
                 clip_start = pres_start
@@ -153,7 +153,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 if pres_end > data_end:
                     clip_end = data_end_plot
                 
-                # Force add shape for debugging
+                # Add shape with higher opacity
                 fig.add_shape(
                     type="rect",
                     x0=clip_start,
@@ -163,7 +163,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                     yref="paper",
                     fillcolor=color,
                     line=dict(width=0),
-                    layer="below"
+                    layer="above"
                 )
                 
                 presidents_added += 1
@@ -257,7 +257,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                         if pres_end < data_start or pres_start > data_end:
                             continue
                         
-                        color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
+                        color = 'rgba(0, 100, 200, 0.4)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.4)'
                         
                         # Clip presidential term to actual data range using original data timestamps
                         clip_start = pres_start
@@ -269,7 +269,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                         if pres_end > data_end:
                             clip_end = data_end_plot
                         
-                        # Add shapes for both subplots
+                        # Add shapes for both subplots with higher opacity
                         for row in [1, 2]:
                             fig.add_shape(
                                 type="rect",
@@ -280,7 +280,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                                 yref=f"y{row} domain",
                                 fillcolor=color,
                                 line=dict(width=0),
-                                layer="below",
+                                layer="above",
                                 row=row, col=1
                             )
                     except Exception:
@@ -477,28 +477,7 @@ if data is not None:
                 delta=None
             )
     
-    # Debug info for All Time period
-    if selected_period_label == "All Time" and show_presidential_overlay:
-        presidents_df = get_presidential_data()
-        st.sidebar.info(f"Debug: Data range {data.index.min()} to {data.index.max()}")
-        st.sidebar.info(f"Debug: Presidents data loaded: {len(presidents_df)} presidents")
-        
-        # Check if any presidents should overlap
-        data_start = data.index.min()
-        data_end = data.index.max()
-        if hasattr(data_start, 'tz') and data_start.tz:
-            data_start = data_start.tz_convert('UTC').tz_localize(None)
-        if hasattr(data_end, 'tz') and data_end.tz:
-            data_end = data_end.tz_convert('UTC').tz_localize(None)
-        
-        overlapping_presidents = []
-        for _, president in presidents_df.iterrows():
-            pres_start = pd.Timestamp(president['start'])
-            pres_end = pd.Timestamp(president['end'])
-            if not (pres_end < data_start or pres_start > data_end):
-                overlapping_presidents.append(president['name'])
-        
-        st.sidebar.info(f"Debug: Overlapping presidents: {overlapping_presidents}")
+
     
     # Create and display the interactive chart
     fig = create_interactive_chart(data, f"U.S. Dollar Index (DXY) - {selected_period_label}", show_presidential_overlay)
