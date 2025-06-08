@@ -142,7 +142,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                 if pres_end < data_start or pres_start > data_end:
                     continue
                 
-                color = 'rgba(0, 100, 200, 0.4)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.4)'
+                color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                 
                 # Clip presidential term to actual data range using original data timestamps
                 clip_start = pres_start
@@ -262,7 +262,7 @@ def create_interactive_chart(data, title="U.S. Dollar Index (DXY)", show_preside
                         if pres_end < data_start or pres_start > data_end:
                             continue
                         
-                        color = 'rgba(0, 100, 200, 0.4)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.4)'
+                        color = 'rgba(0, 100, 200, 0.1)' if president['party'] == 'Democrat' else 'rgba(200, 50, 50, 0.1)'
                         
                         # Clip presidential term to actual data range using original data timestamps
                         clip_start = pres_start
