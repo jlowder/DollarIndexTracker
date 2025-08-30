@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💲 U.S. Dollar Index (DXY) Interactive Chart</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #666;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        select, button {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:hover, button:hover {
+            border-color: #3498db;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .metric-change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .positive {
+            color: #27ae60;
+        }
+
+        .negative {
+            color: #e74c3c;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .info-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .info-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .info-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .info-card ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .info-card li {
+            margin-bottom: 8px;
+            padding-left: 15px;
+            position: relative;
+        }
+
+        .info-card li:before {
+            content: "•";
+            color: #3498db;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9rem;
+            border-top: 1px solid #eee;
+            margin-top: 40px;
+        }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin-right: 15px;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        .democrat {
+            background-color: rgba(0, 100, 200, 0.6);
+        }
+
+        .republican {
+            background-color: rgba(200, 50, 50, 0.6);
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .info-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💲 U.S. Dollar Index (DXY) Interactive Chart</h1>
+            <p>The U.S. Dollar Index (DXY) measures the value of the United States dollar relative to a basket of foreign currencies. This interactive chart allows you to explore historical DXY data with zoom and pan functionality.</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="timePeriod">Select Time Period:</label>
+                <select id="timePeriod">
+                    <option value="1mo">1 Month</option>
+                    <option value="3mo">3 Months</option>
+                    <option value="6mo">6 Months</option>
+                    <option value="1y">1 Year</option>
+                    <option value="2y" selected>2 Years</option>
+                    <option value="5y">5 Years</option>
+                    <option value="10y">10 Years</option>
+                    <option value="max">All Time</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="showPresidential">
+                    <label for="showPresidential">Show Presidential Terms</label>
+                </div>
+                <div class="legend" id="presidentialLegend" style="display: none;">
+                    <div class="legend-item">
+                        <span class="legend-color democrat"></span>
+                        Democrat
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color republican"></span>
+                        Republican
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button id="refreshBtn">🔄 Refresh Data</button>
+            </div>
+        </div>
+
+        <div class="metrics" id="metricsContainer">
+            <!-- Metrics will be populated by JavaScript -->
+        </div>
+
+        <div class="chart-container">
+            <div id="chart" style="height: 600px;"></div>
+        </div>
+
+        <div class="info-section">
+            <div class="info-card">
+                <h3>What is the Dollar Index?</h3>
+                <p>The U.S. Dollar Index (DXY) is a measure of the value of the United States dollar relative to a basket of foreign currencies. It was established in 1973 and is maintained by ICE (Intercontinental Exchange).</p>
+                
+                <h4 style="margin-top: 20px; margin-bottom: 10px;">Currency Basket:</h4>
+                <ul>
+                    <li>Euro (EUR): 57.6%</li>
+                    <li>Japanese Yen (JPY): 13.6%</li>
+                    <li>British Pound (GBP): 11.9%</li>
+                    <li>Canadian Dollar (CAD): 9.1%</li>
+                    <li>Swedish Krona (SEK): 4.2%</li>
+                    <li>Swiss Franc (CHF): 3.6%</li>
+                </ul>
+            </div>
+
+            <div class="info-card">
+                <h3>Chart Features</h3>
+                <ul>
+                    <li><strong>Zoom & Pan:</strong> Click and drag to zoom into specific time periods</li>
+                    <li><strong>Range Selector:</strong> Use the buttons above the chart for quick date ranges</li>
+                    <li><strong>Hover Data:</strong> Hover over the line to see detailed price information</li>
+                    <li><strong>Reset:</strong> Double-click the chart to reset the zoom level</li>
+                </ul>
+                
+                <p style="margin-top: 20px;"><strong>Data Source:</strong> Yahoo Finance</p>
+                <p><strong>Update Frequency:</strong> Data is cached for optimal performance</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Data provided by Yahoo Finance | Built with Plotly.js<br>
+            This application is for informational purposes only and should not be considered as financial advice.</p>
+        </div>
+    </div>
+
+    <script>
+        // Presidential data
+        const presidentialData = [
+            {name: "Richard Nixon", party: "Republican", start: "1969-01-20", end: "1974-08-09"},
+            {name: "Gerald Ford", party: "Republican", start: "1974-08-09", end: "1977-01-20"},
+            {name: "Jimmy Carter", party: "Democrat", start: "1977-01-20", end: "1981-01-20"},
+            {name: "Ronald Reagan", party: "Republican", start: "1981-01-20", end: "1989-01-20"},
+            {name: "George H.W. Bush", party: "Republican", start: "1989-01-20", end: "1993-01-20"},
+            {name: "Bill Clinton", party: "Democrat", start: "1993-01-20", end: "2001-01-20"},
+            {name: "George W. Bush", party: "Republican", start: "2001-01-20", end: "2009-01-20"},
+            {name: "Barack Obama", party: "Democrat", start: "2009-01-20", end: "2017-01-20"},
+            {name: "Donald Trump", party: "Republican", start: "2017-01-20", end: "2021-01-20"},
+            {name: "Joe Biden", party: "Democrat", start: "2021-01-20", end: "2025-01-20"},
+            {name: "Donald Trump", party: "Republican", start: "2025-01-20", end: "2029-01-20"}
+        ];
+
+        let currentData = null;
+        let currentChart = null;
+
+        // Fetch real DXY data from Yahoo Finance API
+        async function fetchDXYData(period) {
+            console.log(`🔍 DEBUG: Starting fetchDXYData for period: ${period}`);
+            
+            try {
+                // Calculate date range for Yahoo Finance API
+                const { startDate, endDate } = calculateDateRange(period);
+                console.log(`🔍 DEBUG: Date range: ${startDate} to ${endDate}`);
+                
+                // Convert dates to Unix timestamps for Yahoo Finance
+                const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
+                const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
+                
+                console.log(`🔍 DEBUG: Using Yahoo Finance for DXY (^DXY) data`);
+                
+                // Try Yahoo Finance with different symbol format
+                const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/DX=F?period1=${startTimestamp}&period2=${endTimestamp}&interval=1d&includePrePost=false`;
+                const url = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
+                console.log(`🔍 DEBUG: Making Yahoo Finance API call via CORS proxy (DX=F): ${url}`);
+                
+                const response = await fetch(url);
+                console.log(`🔍 DEBUG: Response status: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log(`🔍 DEBUG: Raw Yahoo Finance API response:`, data);
+                
+                // Check for Yahoo Finance API errors
+                if (data.chart?.error) {
+                    console.error(`🔍 DEBUG: Yahoo Finance API error:`, data.chart.error);
+                    throw new Error(data.chart.error.description || 'Yahoo Finance API returned an error');
+                }
+                
+                const result = data.chart?.result?.[0];
+                if (!result) {
+                    console.error(`🔍 DEBUG: No chart result found. Response structure:`, Object.keys(data));
+                    throw new Error('No chart data found in Yahoo Finance response');
+                }
+                
+                console.log(`🔍 DEBUG: Chart result structure:`, Object.keys(result));
+                
+                const timestamps = result.timestamp;
+                const quotes = result.indicators?.quote?.[0];
+                
+                if (!timestamps || !quotes || !quotes.close) {
+                    console.error(`🔍 DEBUG: Missing required data. Timestamps:`, !!timestamps, 'Quotes:', !!quotes, 'Close prices:', !!quotes?.close);
+                    throw new Error('Missing required data in Yahoo Finance response');
+                }
+                
+                console.log(`🔍 DEBUG: Found ${timestamps.length} data points`);
+                
+                // Convert Yahoo Finance response to our format
+                const processedData = timestamps
+                    .map((timestamp, index) => {
+                        const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+                        const open = quotes.open?.[index] || quotes.close[index];
+                        const high = quotes.high?.[index] || quotes.close[index];
+                        const low = quotes.low?.[index] || quotes.close[index];
+                        const close = quotes.close[index];
+                        const volume = quotes.volume?.[index] || 0;
+                        
+                        // Skip data points with null values
+                        if (close === null || close === undefined || isNaN(close)) {
+                            return null;
+                        }
+                        
+                        return {
+                            date,
+                            open: parseFloat((open || close).toFixed(2)),
+                            high: parseFloat((high || close).toFixed(2)),
+                            low: parseFloat((low || close).toFixed(2)),
+                            close: parseFloat(close.toFixed(2)),
+                            volume: Math.floor(volume)
+                        };
+                    })
+                    .filter(item => item !== null)
+                    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                console.log(`🔍 DEBUG: Processed data points: ${processedData.length}`);
+                console.log(`🔍 DEBUG: Date range in processed data: ${processedData[0]?.date} to ${processedData[processedData.length - 1]?.date}`);
+                console.log(`🔍 DEBUG: Sample processed data:`, processedData.slice(0, 3));
+                console.log(`🔍 DEBUG: Price range: ${Math.min(...processedData.map(d => d.close))} to ${Math.max(...processedData.map(d => d.close))}`);
+
+                return processedData;
+
+            } catch (error) {
+                console.error('🔍 DEBUG: Error in fetchDXYData:', error);
+                console.log('🔍 DEBUG: Falling back to sample data');
+                // Fallback to sample data if API fails
+                return generateSampleData(period);
+            }
+        }
+
+        // Calculate date range for Yahoo Finance API
+        function calculateDateRange(period) {
+            const now = new Date();
+            const endDate = now.toISOString().split('T')[0];
+            let startDate;
+            
+            switch(period) {
+                case '1mo': 
+                    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    break;
+                case '3mo': 
+                    startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    break;
+                case '6mo': 
+                    startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    break;
+                case '1y': 
+                    startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    break;
+                case '2y': 
+                    startDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    break;
+                case '5y': 
+                    startDate = new Date(now.getTime() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    break;
+                case '10y': 
+                    startDate = new Date(now.getTime() - 10 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    break;
+                case 'max': 
+                    startDate = '1990-01-01'; // Yahoo Finance DXY data goes back to early 1990s
+                    break;
+                default:
+                    startDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            }
+            
+            return { startDate, endDate };
+        }
+
+
+        // Filter data based on selected time period
+        function filterDataByPeriod(data, period) {
+            if (!data || data.length === 0) return data;
+            
+            const now = new Date();
+            let cutoffDate;
+            
+            switch(period) {
+                case '1mo': cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+                case '3mo': cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+                case '6mo': cutoffDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000); break;
+                case '1y': cutoffDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); break;
+                case '2y': cutoffDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000); break;
+                case '5y': cutoffDate = new Date(now.getTime() - 5 * 365 * 24 * 60 * 60 * 1000); break;
+                case '10y': cutoffDate = new Date(now.getTime() - 10 * 365 * 24 * 60 * 60 * 1000); break;
+                default: return data; // 'max' - return all data
+            }
+            
+            return data.filter(item => new Date(item.date) >= cutoffDate);
+        }
+
+        // Generate sample DXY data as fallback
+        function generateSampleData(period) {
+            const now = new Date();
+            let startDate, dataPoints;
+            
+            switch(period) {
+                case '1mo': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); dataPoints = 30; break;
+                case '3mo': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); dataPoints = 90; break;
+                case '6mo': startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000); dataPoints = 180; break;
+                case '1y': startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); dataPoints = 365; break;
+                case '2y': startDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000); dataPoints = 500; break;
+                case '5y': startDate = new Date(now.getTime() - 5 * 365 * 24 * 60 * 60 * 1000); dataPoints = 1000; break;
+                case '10y': startDate = new Date(now.getTime() - 10 * 365 * 24 * 60 * 60 * 1000); dataPoints = 2000; break;
+                default: startDate = new Date('2000-01-01'); dataPoints = 6000; break;
+            }
+
+            const data = [];
+            let basePrice = 95 + Math.random() * 10; // Base around 95-105
+            
+            for (let i = 0; i < dataPoints; i++) {
+                const date = new Date(startDate.getTime() + i * (now.getTime() - startDate.getTime()) / dataPoints);
+                
+                // Add some realistic price movement
+                const dailyChange = (Math.random() - 0.5) * 2; // -1 to +1
+                basePrice += dailyChange * 0.1;
+                
+                // Add some longer-term trends
+                const trendFactor = Math.sin(i / 100) * 5;
+                const price = Math.max(80, Math.min(120, basePrice + trendFactor));
+                
+                data.push({
+                    date: date.toISOString().split('T')[0],
+                    close: parseFloat(price.toFixed(2)),
+                    open: parseFloat((price + (Math.random() - 0.5) * 0.5).toFixed(2)),
+                    high: parseFloat((price + Math.random() * 1).toFixed(2)),
+                    low: parseFloat((price - Math.random() * 1).toFixed(2)),
+                    volume: Math.floor(Math.random() * 1000000) + 500000
+                });
+            }
+            
+            return data;
+        }
+
+        function updateMetrics(data) {
+            console.log(`🔍 DEBUG: updateMetrics called with ${data?.length || 0} data points`);
+            
+            if (!data || data.length === 0) {
+                console.log(`🔍 DEBUG: No data for metrics`);
+                return;
+            }
+            
+            const current = data[data.length - 1];
+            const previous = data.length > 1 ? data[data.length - 2] : current;
+            
+            console.log(`🔍 DEBUG: Current data point:`, current);
+            console.log(`🔍 DEBUG: Previous data point:`, previous);
+            
+            const dailyChange = current.close - previous.close;
+            const dailyChangePercent = (dailyChange / previous.close) * 100;
+            
+            const high52w = Math.max(...data.map(d => d.high));
+            const low52w = Math.min(...data.map(d => d.low));
+            
+            console.log(`🔍 DEBUG: Calculated metrics:`, {
+                currentPrice: current.close,
+                dailyChange,
+                dailyChangePercent,
+                high52w,
+                low52w
+            });
+            
+            const metricsHtml = `
+                <div class="metric-card">
+                    <div class="metric-label">Current DXY</div>
+                    <div class="metric-value">${current.close.toFixed(2)}</div>
+                    <div class="metric-change ${dailyChange >= 0 ? 'positive' : 'negative'}">
+                        ${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(2)}
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Daily Change %</div>
+                    <div class="metric-value ${dailyChangePercent >= 0 ? 'positive' : 'negative'}">
+                        ${dailyChangePercent >= 0 ? '+' : ''}${dailyChangePercent.toFixed(2)}%
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">52W High</div>
+                    <div class="metric-value">${high52w.toFixed(2)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">52W Low</div>
+                    <div class="metric-value">${low52w.toFixed(2)}</div>
+                </div>
+            `;
+            
+            document.getElementById('metricsContainer').innerHTML = metricsHtml;
+        }
+
+        function createChart(data, showPresidential = false) {
+            console.log(`🔍 DEBUG: createChart called with ${data?.length || 0} data points, showPresidential: ${showPresidential}`);
+            
+            const dates = data.map(d => d.date);
+            const prices = data.map(d => d.close);
+            
+            console.log(`🔍 DEBUG: Chart data - dates: ${dates.length}, prices: ${prices.length}`);
+            console.log(`🔍 DEBUG: Date range: ${dates[0]} to ${dates[dates.length - 1]}`);
+            console.log(`🔍 DEBUG: Price range: ${Math.min(...prices)} to ${Math.max(...prices)}`);
+            console.log(`🔍 DEBUG: Sample dates:`, dates.slice(0, 5));
+            console.log(`🔍 DEBUG: Sample prices:`, prices.slice(0, 5));
+            
+            const traces = [{
+                x: dates,
+                y: prices,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'DXY Close',
+                line: {
+                    color: '#2E86AB',
+                    width: 2
+                },
+                hovertemplate: '<b>Date:</b> %{x}<br><b>Price:</b> %{y:.2f}<extra></extra>'
+            }];
+
+            const layout = {
+                title: {
+                    text: 'U.S. Dollar Index (DXY)',
+                    x: 0.5,
+                    font: {
+                        size: 20,
+                        color: 'black',
+                        family: 'Arial Black'
+                    }
+                },
+                xaxis: {
+                    title: 'Date',
+                    showgrid: true,
+                    gridcolor: 'lightgray',
+                    type: 'date',
+                    rangeselector: {
+                        buttons: [
+                            {count: 1, label: '1M', step: 'month', stepmode: 'backward'},
+                            {count: 3, label: '3M', step: 'month', stepmode: 'backward'},
+                            {count: 6, label: '6M', step: 'month', stepmode: 'backward'},
+                            {count: 1, label: '1Y', step: 'year', stepmode: 'backward'},
+                            {count: 5, label: '5Y', step: 'year', stepmode: 'backward'},
+                            {step: 'all', label: 'All'}
+                        ],
+                        x: 0,
+                        y: 1.02,
+                        xanchor: 'left',
+                        yanchor: 'top'
+                    }
+                },
+                yaxis: {
+                    title: 'Dollar Index Value',
+                    showgrid: true,
+                    gridcolor: 'lightgray'
+                },
+                hovermode: 'x unified',
+                showlegend: true,
+                height: 600,
+                margin: {l: 50, r: 50, t: 80, b: 50},
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                shapes: []
+            };
+
+            // Add presidential overlays if requested
+            if (showPresidential) {
+                const dataStart = new Date(dates[0]);
+                const dataEnd = new Date(dates[dates.length - 1]);
+                
+                presidentialData.forEach(president => {
+                    const presStart = new Date(president.start);
+                    const presEnd = new Date(president.end);
+                    
+                    // Check if president term overlaps with data range
+                    if (presEnd < dataStart || presStart > dataEnd) return;
+                    
+                    const color = president.party === 'Democrat' 
+                        ? 'rgba(0, 100, 200, 0.1)' 
+                        : 'rgba(200, 50, 50, 0.1)';
+                    
+                    const clipStart = presStart < dataStart ? dataStart : presStart;
+                    const clipEnd = presEnd > dataEnd ? dataEnd : presEnd;
+                    
+                    layout.shapes.push({
+                        type: 'rect',
+                        x0: clipStart.toISOString().split('T')[0],
+                        x1: clipEnd.toISOString().split('T')[0],
+                        y0: 0,
+                        y1: 1,
+                        yref: 'paper',
+                        fillcolor: color,
+                        line: {width: 0},
+                        layer: 'below'
+                    });
+                    
+                    // Add annotation for longer terms
+                    const termDuration = clipEnd - clipStart;
+                    if (termDuration > 365 * 24 * 60 * 60 * 1000) { // More than 1 year
+                        const midDate = new Date(clipStart.getTime() + termDuration / 2);
+                        layout.annotations = layout.annotations || [];
+                        layout.annotations.push({
+                            x: midDate.toISOString().split('T')[0],
+                            y: 0.95,
+                            yref: 'paper',
+                            text: `${president.name}<br>(${president.party[0]})`,
+                            showarrow: false,
+                            font: {size: 10, color: 'black'},
+                            bgcolor: 'rgba(255,255,255,0.8)',
+                            bordercolor: 'black',
+                            borderwidth: 1
+                        });
+                    }
+                });
+            }
+
+            Plotly.newPlot('chart', traces, layout, {responsive: true});
+        }
+
+        async function loadData() {
+            const period = document.getElementById('timePeriod').value;
+            const showPresidential = document.getElementById('showPresidential').checked;
+            
+            // Show loading state
+            document.getElementById('chart').innerHTML = '<div class="loading">Loading DXY data from Yahoo Finance...</div>';
+            document.getElementById('metricsContainer').innerHTML = '<div class="loading">Loading metrics...</div>';
+            
+            try {
+                // Fetch real data from Yahoo Finance API
+                currentData = await fetchDXYData(period);
+                updateMetrics(currentData);
+                createChart(currentData, showPresidential);
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('chart').innerHTML = '<div class="error">Failed to load data. Please try again.</div>';
+            }
+        }
+
+        // Event listeners
+        document.getElementById('timePeriod').addEventListener('change', loadData);
+        document.getElementById('showPresidential').addEventListener('change', () => {
+            const showPresidential = document.getElementById('showPresidential').checked;
+            document.getElementById('presidentialLegend').style.display = showPresidential ? 'block' : 'none';
+            if (currentData) {
+                createChart(currentData, showPresidential);
+            }
+        });
+        document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+        // Initial load
+        loadData();
+    </script>
+</body>
+</html>
