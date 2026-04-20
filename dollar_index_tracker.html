@@ -239,6 +239,56 @@
             background-color: rgba(200, 50, 50, 0.6);
         }
 
+        /* Loading Spinner & Status */
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(52, 152, 219, 0.1);
+            border-left-color: #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            backdrop-filter: blur(2px);
+        }
+
+        #loadingStatus {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-top: 10px;
+            font-size: 1.1rem;
+        }
+
+        #loadingDetail {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -255,6 +305,12 @@
     </style>
 </head>
 <body>
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingStatus">Fetching live financial data...</div>
+        <div id="loadingDetail">Connecting to Yahoo Finance...</div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>💲 U.S. Dollar Index (DXY) Interactive Chart</h1>
@@ -361,6 +417,11 @@
         let currentData = null;
         let currentChart = null;
 
+        function updateLoadingDetail(text) {
+            const detail = document.getElementById('loadingDetail');
+            if (detail) detail.innerText = text;
+        }
+
         /**
          * Robust fetch function that tries multiple CORS proxies and Yahoo Finance endpoints
          */
@@ -405,6 +466,7 @@
                 for (const proxy of proxies) {
                     const proxyUrl = proxy.getUrl(targetUrl);
                     console.log(`🔍 DEBUG: Trying ${proxy.name} with ${host}...`);
+                    updateLoadingDetail(`Trying ${proxy.name}...`);
 
                     try {
                         const controller = new AbortController();
@@ -454,6 +516,9 @@
 
                 try {
                     console.log(`🔍 DEBUG: Attempting fetch with interval: ${interval}`);
+                    const intervalLabel = interval === '1d' ? 'daily' : (interval === '1wk' ? 'weekly' : 'monthly');
+                    updateLoadingDetail(`Fetching ${intervalLabel} data...`);
+
                     const yahooPath = `/v8/finance/chart/DX-Y.NYB?range=${period}&interval=${interval}&includePrePost=false`;
                     const data = await fetchWithFallback(yahooPath);
                 
@@ -773,6 +838,11 @@
             const showPresidential = document.getElementById('showPresidential').checked;
             
             // Show loading state
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+            document.getElementById('refreshBtn').classList.add('disabled');
+            document.getElementById('timePeriod').classList.add('disabled');
+
             document.getElementById('chart').innerHTML = '<div class="loading">Loading DXY data from Yahoo Finance...</div>';
             document.getElementById('metricsContainer').innerHTML = '<div class="loading">Loading metrics...</div>';
             
@@ -804,6 +874,10 @@
             } catch (error) {
                 console.error('Error loading data:', error);
                 document.getElementById('chart').innerHTML = '<div class="error">Failed to load data. Please try again.</div>';
+            } finally {
+                overlay.style.display = 'none';
+                document.getElementById('refreshBtn').classList.remove('disabled');
+                document.getElementById('timePeriod').classList.remove('disabled');
             }
         }
 
