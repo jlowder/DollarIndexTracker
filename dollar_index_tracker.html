@@ -463,7 +463,7 @@
                     name: 'Direct (No Proxy)',
                     getUrl: (url) => url,
                     parse: (data) => data,
-                    timeout: 5000
+                    timeout: 2000
                 },
                 {
                     name: 'AllOrigins (Wrapped)',
@@ -584,20 +584,18 @@
                         const quotes = result.indicators?.quote?.[0];
                         if (!timestamps || !quotes || !quotes.close) throw new Error('Missing required data');
 
-                        const formatPrice = (val, fallback) => parseFloat((val ?? fallback).toFixed(2));
                         const processedData = timestamps
                             .map((timestamp, index) => {
                                 const close = quotes.close[index];
                                 if (close === null || close === undefined || isNaN(close)) return null;
                                 return {
                                     date: new Date(timestamp * 1000).toISOString().split('T')[0],
-                                    open: formatPrice(quotes.open?.[index], close),
-                                    high: formatPrice(quotes.high?.[index], close),
-                                    low: formatPrice(quotes.low?.[index], close),
-                                    close: formatPrice(close, close),
+                                    open: parseFloat((quotes.open?.[index] || close).toFixed(2)),
+                                    high: parseFloat((quotes.high?.[index] || close).toFixed(2)),
+                                    low: parseFloat((quotes.low?.[index] || close).toFixed(2)),
+                                    close: parseFloat(close.toFixed(2)),
                                     volume: Math.floor(quotes.volume?.[index] || 0)
                                 };
-                            })
                             })
                             .filter(item => item !== null);
 
@@ -654,11 +652,11 @@
             }
 
             const chunks = [];
-            const SECONDS_IN_TWO_YEARS = 2 * 365 * 24 * 60 * 60;
+            const twoYearsInSeconds = 2 * 365 * 24 * 60 * 60;
 
             let currentStart = startTime;
             while (currentStart < now) {
-                let currentEnd = Math.min(currentStart + SECONDS_IN_TWO_YEARS, now);
+                let currentEnd = Math.min(currentStart + twoYearsInSeconds, now);
                 chunks.push({ start: currentStart, end: currentEnd });
                 currentStart = currentEnd + 1;
             }
@@ -973,9 +971,7 @@
                 createChart(currentData, showPresidential, isSimulated);
             } catch (innerError) {
                 console.error('Error processing data:', innerError);
-                const chartDiv = document.getElementById('chart');
-                chartDiv.innerHTML = '<div class="error">Error rendering chart: <span id="errorMessage"></span></div>';
-                document.getElementById('errorMessage').textContent = innerError.message;
+                document.getElementById('chart').innerHTML = `<div class="error">Error rendering chart: ${innerError.message}</div>`;
             } finally {
                 overlay.style.display = 'none';
                 document.getElementById('refreshBtn').classList.remove('disabled');
