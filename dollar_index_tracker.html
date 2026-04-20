@@ -973,7 +973,9 @@
                 createChart(currentData, showPresidential, isSimulated);
             } catch (innerError) {
                 console.error('Error processing data:', innerError);
-                document.getElementById('chart').innerHTML = `<div class="error">Error rendering chart: ${innerError.message}</div>`;
+                const chartDiv = document.getElementById('chart');
+                chartDiv.innerHTML = '<div class="error">Error rendering chart: <span id="errorMessage"></span></div>';
+                document.getElementById('errorMessage').textContent = innerError.message;
             } finally {
                 overlay.style.display = 'none';
                 document.getElementById('refreshBtn').classList.remove('disabled');
