@@ -4,7 +4,8 @@ An interactive, self-contained web application for visualizing U.S. Dollar Index
 
 ## Features
 
-- **Real-time DXY data**: Fetches data from Yahoo Finance via a CORS proxy.
+- **Real-time DXY data**: Fetches data from Yahoo Finance via robust CORS proxies with multiple fallback mechanisms.
+- **Offline/Simulated Mode**: Automatically falls back to high-quality simulated data if live financial servers are unreachable.
 - **Interactive charts**: Zoom and pan capabilities powered by Plotly.js.
 - **Presidential Overlays**: Toggle visibility of U.S. presidential terms to see historical context.
 - **Multiple time periods**: Select from 1 month to "All Time" (back to the 1990s).
@@ -38,7 +39,17 @@ Then visit `http://localhost:8000` (or the port provided).
 - **Frontend**: HTML5, CSS3, and Vanilla JavaScript.
 - **Charting Library**: [Plotly.js](https://plotly.com/javascript/)
 - **Data Source**: Yahoo Finance (ticker: `DX-Y.NYB`)
-- **CORS Proxy**: Uses `allorigins.win` to fetch data directly from the browser.
+- **CORS Mitigation**: Employs a `fetchWithFallback` mechanism that cycles through multiple proxies (AllOrigins, CodeTabs) and Yahoo endpoints (query1, query2) to ensure data reliability, even when loaded via the `file://` protocol.
+
+## Simulated Data & Offline Mode
+
+If the application cannot connect to live financial servers (e.g., due to network issues or restrictive CORS environments), it will automatically enter **Simulated Mode**. This is clearly indicated in the UI:
+
+1.  **Warning Banner**: A yellow "DATA STATUS: SIMULATED / OFFLINE MODE" message appears at the top.
+2.  **Badge**: A "⚠️ SIMULATED DATA" tag is displayed above the metrics.
+3.  **Chart Title**: The chart title changes to red and includes the suffix "- SIMULATED DATA".
+
+This ensures that users are always aware of whether they are viewing live market data or generated demonstration data.
 
 ## About the Dollar Index
 
