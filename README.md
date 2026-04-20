@@ -51,5 +51,9 @@ The U.S. Dollar Index (DXY) measures the value of the United States dollar relat
 - Swedish Krona (SEK): 4.2%
 - Swiss Franc (CHF): 3.6%
 
+## License
+
+MIT
+
 ---
 *Disclaimer: This application is for informational purposes only and should not be considered as financial advice.*
