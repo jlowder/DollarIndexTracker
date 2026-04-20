@@ -284,6 +284,23 @@
             margin-top: 5px;
         }
 
+        #progressContainer {
+            width: 300px;
+            height: 10px;
+            background: #eee;
+            border-radius: 5px;
+            margin-top: 20px;
+            overflow: hidden;
+            display: none;
+        }
+
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            background: #3498db;
+            transition: width 0.3s ease;
+        }
+
         .disabled {
             opacity: 0.6;
             pointer-events: none;
@@ -309,6 +326,9 @@
         <div class="spinner"></div>
         <div id="loadingStatus">Fetching live financial data...</div>
         <div id="loadingDetail">Connecting to Yahoo Finance...</div>
+        <div id="progressContainer">
+            <div id="progressBar"></div>
+        </div>
     </div>
 
     <div class="container">
@@ -417,6 +437,10 @@
         let currentData = null;
         let currentChart = null;
 
+        // Persistent successful connection indices
+        let preferredProxyIndex = 0;
+        let preferredHostIndex = 0;
+
         function updateLoadingDetail(text) {
             const detail = document.getElementById('loadingDetail');
             if (detail) detail.innerText = text;
@@ -458,12 +482,18 @@
                 }
             ];
 
+            // Reorder hosts and proxies based on preferred indices
+            const hostOrder = [preferredHostIndex, ...yahooHosts.map((_, i) => i).filter(i => i !== preferredHostIndex)];
+            const proxyOrder = [preferredProxyIndex, ...proxies.map((_, i) => i).filter(i => i !== preferredProxyIndex)];
+
             let lastError = null;
 
-            for (const host of yahooHosts) {
+            for (const hostIdx of hostOrder) {
+                const host = yahooHosts[hostIdx];
                 const targetUrl = `${host}${yahooPath}`;
 
-                for (const proxy of proxies) {
+                for (const proxyIdx of proxyOrder) {
+                    const proxy = proxies[proxyIdx];
                     const proxyUrl = proxy.getUrl(targetUrl);
                     console.log(`🔍 DEBUG: Trying ${proxy.name} with ${host}...`);
                     updateLoadingDetail(`Trying ${proxy.name}...`);
@@ -486,6 +516,11 @@
 
                         if (data && data.chart && !data.chart.error) {
                             console.log(`✅ DEBUG: Successfully fetched data via ${proxy.name} from ${host}`);
+
+                            // Remember these successful indices
+                            preferredProxyIndex = proxyIdx;
+                            preferredHostIndex = hostIdx;
+
                             return data;
                         } else if (data && data.chart && data.chart.error) {
                             console.warn(`⚠️ DEBUG: Yahoo API error via ${proxy.name}:`, data.chart.error);
@@ -504,83 +539,129 @@
         async function fetchDXYData(period) {
             console.log(`🔍 DEBUG: Starting fetchDXYData for period: ${period}`);
             
-            const intervalsToTry = ['1d', '1wk', '1mo'];
+            const chunks = calculateChunks(period);
+            const totalChunks = chunks.length;
+            const progressBar = document.getElementById('progressBar');
+            const progressContainer = document.getElementById('progressContainer');
+
+            if (totalChunks > 1) {
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+            } else {
+                progressContainer.style.display = 'none';
+            }
+
+            const allData = [];
             let lastFetchError = null;
 
-            for (const interval of intervalsToTry) {
-                // Skip daily interval for periods > 2 years to avoid large payloads that crash proxies
-                if (interval === '1d' && ['5y', '10y', 'max'].includes(period)) {
-                    console.log(`🔍 DEBUG: Skipping 1d interval for ${period} to avoid proxy timeout`);
-                    continue;
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const intervalsToTry = ['1d', '1wk', '1mo'];
+                let chunkSuccess = false;
+
+                if (totalChunks > 1) {
+                    updateLoadingDetail(`Fetching data chunk ${i + 1} of ${totalChunks}...`);
                 }
 
-                try {
-                    console.log(`🔍 DEBUG: Attempting fetch with interval: ${interval}`);
-                    const intervalLabel = interval === '1d' ? 'daily' : (interval === '1wk' ? 'weekly' : 'monthly');
-                    updateLoadingDetail(`Fetching ${intervalLabel} data...`);
+                for (const interval of intervalsToTry) {
+                    try {
+                        const yahooPath = `/v8/finance/chart/DX-Y.NYB?period1=${chunk.start}&period2=${chunk.end}&interval=${interval}&includePrePost=false`;
+                        const data = await fetchWithFallback(yahooPath);
 
-                    const yahooPath = `/v8/finance/chart/DX-Y.NYB?range=${period}&interval=${interval}&includePrePost=false`;
-                    const data = await fetchWithFallback(yahooPath);
-                
-                    const result = data.chart?.result?.[0];
-                    if (!result) {
-                        throw new Error('No chart data found in Yahoo Finance response');
-                    }
-                
-                    const timestamps = result.timestamp;
-                    const quotes = result.indicators?.quote?.[0];
+                        const result = data.chart?.result?.[0];
+                        if (!result) throw new Error('No chart data found');
 
-                    if (!timestamps || !quotes || !quotes.close) {
-                        throw new Error('Missing required data in Yahoo Finance response');
-                    }
+                        const timestamps = result.timestamp;
+                        const quotes = result.indicators?.quote?.[0];
+                        if (!timestamps || !quotes || !quotes.close) throw new Error('Missing required data');
 
-                    console.log(`🔍 DEBUG: Found ${timestamps.length} data points`);
+                        const processedData = timestamps
+                            .map((timestamp, index) => {
+                                const close = quotes.close[index];
+                                if (close === null || close === undefined || isNaN(close)) return null;
+                                return {
+                                    date: new Date(timestamp * 1000).toISOString().split('T')[0],
+                                    open: parseFloat((quotes.open?.[index] || close).toFixed(2)),
+                                    high: parseFloat((quotes.high?.[index] || close).toFixed(2)),
+                                    low: parseFloat((quotes.low?.[index] || close).toFixed(2)),
+                                    close: parseFloat(close.toFixed(2)),
+                                    volume: Math.floor(quotes.volume?.[index] || 0)
+                                };
+                            })
+                            .filter(item => item !== null);
 
-                    // Convert Yahoo Finance response to our format
-                    const processedData = timestamps
-                        .map((timestamp, index) => {
-                            const date = new Date(timestamp * 1000).toISOString().split('T')[0];
-                            const open = quotes.open?.[index] || quotes.close[index];
-                            const high = quotes.high?.[index] || quotes.close[index];
-                            const low = quotes.low?.[index] || quotes.close[index];
-                            const close = quotes.close[index];
-                            const volume = quotes.volume?.[index] || 0;
+                        if (processedData.length > 0) {
+                            allData.push(...processedData);
+                            chunkSuccess = true;
 
-                            if (close === null || close === undefined || isNaN(close)) {
-                                return null;
+                            if (totalChunks > 1) {
+                                const progress = ((i + 1) / totalChunks) * 100;
+                                progressBar.style.width = `${progress}%`;
                             }
-
-                            return {
-                                date,
-                                open: parseFloat((open || close).toFixed(2)),
-                                high: parseFloat((high || close).toFixed(2)),
-                                low: parseFloat((low || close).toFixed(2)),
-                                close: parseFloat(close.toFixed(2)),
-                                volume: Math.floor(volume)
-                            };
-                        })
-                        .filter(item => item !== null)
-                        .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-                    if (processedData.length === 0) {
-                        throw new Error('No valid data points after processing');
+                            break; // Successfully fetched this chunk
+                        }
+                    } catch (error) {
+                        console.warn(`⚠️ DEBUG: Fetch for chunk ${i+1} with interval ${interval} failed:`, error.message);
+                        lastFetchError = error;
                     }
+                }
 
-                    return { data: processedData, isSimulated: false };
-                } catch (error) {
-                    console.warn(`⚠️ DEBUG: Fetch with interval ${interval} failed:`, error.message);
-                    lastFetchError = error;
+                if (!chunkSuccess) {
+                    console.error(`❌ DEBUG: Failed to fetch chunk ${i + 1}`);
+                    throw lastFetchError || new Error(`Failed to fetch data slice ${i + 1}`);
                 }
             }
 
-            console.error('❌ DEBUG: All fetch attempts failed for fetchDXYData');
+            // Deduplicate and sort
+            const uniqueData = Array.from(new Map(allData.map(item => [item.date, item])).values())
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (uniqueData.length === 0) {
+                throw new Error('No valid data points after processing all chunks');
+            }
+
+            return { data: uniqueData, isSimulated: false };
+        }
+
+        // Calculate time chunks (2-year slices) for a given period
+        function calculateChunks(period) {
+            const now = Math.floor(Date.now() / 1000);
+            let startTime;
+
+            switch(period) {
+                case '1mo': startTime = now - (30 * 24 * 60 * 60); break;
+                case '3mo': startTime = now - (90 * 24 * 60 * 60); break;
+                case '6mo': startTime = now - (180 * 24 * 60 * 60); break;
+                case '1y': startTime = now - (365 * 24 * 60 * 60); break;
+                case '2y': startTime = now - (2 * 365 * 24 * 60 * 60); break;
+                case '5y': startTime = now - (5 * 365 * 24 * 60 * 60); break;
+                case '10y': startTime = now - (10 * 365 * 24 * 60 * 60); break;
+                case 'max': startTime = Math.floor(new Date('1990-01-01').getTime() / 1000); break;
+                default: startTime = now - (2 * 365 * 24 * 60 * 60);
+            }
+
+            const chunks = [];
+            const twoYearsInSeconds = 2 * 365 * 24 * 60 * 60;
+
+            let currentStart = startTime;
+            while (currentStart < now) {
+                let currentEnd = Math.min(currentStart + twoYearsInSeconds, now);
+                chunks.push({ start: currentStart, end: currentEnd });
+                currentStart = currentEnd + 1;
+            }
             
+            return chunks;
+        }
+
+        async function handleFetchError(period, error) {
+            console.error('❌ DEBUG: All fetch attempts failed for fetchDXYData:', error);
+
             // Display error message to user
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
-            errorDiv.innerHTML = `⚠️ <b>Data Error:</b> Failed to fetch live data from Yahoo Finance. Showing simulated data instead.<br><small>Error: ${lastFetchError?.message || 'Unknown error'}</small>`;
+            errorDiv.innerHTML = `⚠️ <b>Data Error:</b> Failed to fetch live data from Yahoo Finance. Showing simulated data instead.<br><small>Error: ${error?.message || 'Unknown error'}</small>`;
             document.querySelector('.container').insertBefore(errorDiv, document.getElementById('metricsContainer'));
-            
+
             // Remove error message after 10 seconds
             setTimeout(() => errorDiv.remove(), 10000);
 
@@ -850,9 +931,15 @@
             const existingWarning = document.getElementById('simulationWarning');
             if (existingWarning) existingWarning.remove();
 
+            let result;
             try {
                 // Fetch data from Yahoo Finance API
-                const result = await fetchDXYData(period);
+                result = await fetchDXYData(period);
+            } catch (error) {
+                result = await handleFetchError(period, error);
+            }
+
+            try {
                 currentData = result.data;
                 const isSimulated = result.isSimulated;
 
@@ -871,9 +958,9 @@
 
                 updateMetrics(currentData, isSimulated);
                 createChart(currentData, showPresidential, isSimulated);
-            } catch (error) {
-                console.error('Error loading data:', error);
-                document.getElementById('chart').innerHTML = '<div class="error">Failed to load data. Please try again.</div>';
+            } catch (innerError) {
+                console.error('Error processing data:', innerError);
+                document.getElementById('chart').innerHTML = `<div class="error">Error rendering chart: ${innerError.message}</div>`;
             } finally {
                 overlay.style.display = 'none';
                 document.getElementById('refreshBtn').classList.remove('disabled');
