@@ -361,6 +361,73 @@
         let currentData = null;
         let currentChart = null;
 
+        /**
+         * Robust fetch function that tries multiple CORS proxies and Yahoo Finance endpoints
+         */
+        async function fetchWithFallback(yahooPath) {
+            const proxies = [
+                {
+                    name: 'AllOrigins (Wrapped)',
+                    getUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                    parse: (data) => JSON.parse(data.contents)
+                },
+                {
+                    name: 'AllOrigins (Raw)',
+                    getUrl: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                    parse: (data) => data
+                },
+                {
+                    name: 'CodeTabs (Raw)',
+                    getUrl: (url) => `https://api.codetabs.com/v1/proxy/?url=${encodeURIComponent(url)}`,
+                    parse: (data) => data
+                }
+            ];
+
+            const yahooHosts = [
+                'https://query2.finance.yahoo.com',
+                'https://query1.finance.yahoo.com'
+            ];
+
+            let lastError = null;
+
+            for (const host of yahooHosts) {
+                const targetUrl = `${host}${yahooPath}`;
+
+                for (const proxy of proxies) {
+                    const proxyUrl = proxy.getUrl(targetUrl);
+                    console.log(`🔍 DEBUG: Trying ${proxy.name} with ${host}...`);
+
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+                        const response = await fetch(proxyUrl, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+
+                        if (!response.ok) {
+                            console.warn(`⚠️ DEBUG: ${proxy.name} returned status ${response.status}`);
+                            continue;
+                        }
+
+                        const rawData = await response.json();
+                        const data = proxy.parse(rawData);
+
+                        if (data && data.chart && !data.chart.error) {
+                            console.log(`✅ DEBUG: Successfully fetched data via ${proxy.name} from ${host}`);
+                            return data;
+                        } else if (data && data.chart && data.chart.error) {
+                            console.warn(`⚠️ DEBUG: Yahoo API error via ${proxy.name}:`, data.chart.error);
+                        }
+                    } catch (e) {
+                        console.warn(`⚠️ DEBUG: ${proxy.name} failed:`, e.message);
+                        lastError = e;
+                    }
+                }
+            }
+
+            throw lastError || new Error('All fetch attempts failed');
+        }
+
         // Fetch real DXY data from Yahoo Finance API
         async function fetchDXYData(period) {
             console.log(`🔍 DEBUG: Starting fetchDXYData for period: ${period}`);
@@ -368,48 +435,24 @@
             try {
                 // Calculate date range for Yahoo Finance API
                 const { startDate, endDate } = calculateDateRange(period);
-                console.log(`🔍 DEBUG: Date range: ${startDate} to ${endDate}`);
                 
                 // Convert dates to Unix timestamps for Yahoo Finance
                 const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
                 const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
                 
-                console.log(`🔍 DEBUG: Using Yahoo Finance for DXY (^DXY) data`);
+                const yahooPath = `/v8/finance/chart/DX-Y.NYB?period1=${startTimestamp}&period2=${endTimestamp}&interval=1d&includePrePost=false`;
                 
-                // Try Yahoo Finance with different symbol format
-                const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?period1=${startTimestamp}&period2=${endTimestamp}&interval=1d&includePrePost=false`;
-                const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
-                console.log(`🔍 DEBUG: Making Yahoo Finance API call via CORS proxy (DX=F): ${url}`);
-                
-                const response = await fetch(url);
-                console.log(`🔍 DEBUG: Response status: ${response.status}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                console.log(`🔍 DEBUG: Raw Yahoo Finance API response:`, data);
-                
-                // Check for Yahoo Finance API errors
-                if (data.chart?.error) {
-                    console.error(`🔍 DEBUG: Yahoo Finance API error:`, data.chart.error);
-                    throw new Error(data.chart.error.description || 'Yahoo Finance API returned an error');
-                }
+                const data = await fetchWithFallback(yahooPath);
                 
                 const result = data.chart?.result?.[0];
                 if (!result) {
-                    console.error(`🔍 DEBUG: No chart result found. Response structure:`, Object.keys(data));
                     throw new Error('No chart data found in Yahoo Finance response');
                 }
-                
-                console.log(`🔍 DEBUG: Chart result structure:`, Object.keys(result));
                 
                 const timestamps = result.timestamp;
                 const quotes = result.indicators?.quote?.[0];
                 
                 if (!timestamps || !quotes || !quotes.close) {
-                    console.error(`🔍 DEBUG: Missing required data. Timestamps:`, !!timestamps, 'Quotes:', !!quotes, 'Close prices:', !!quotes?.close);
                     throw new Error('Missing required data in Yahoo Finance response');
                 }
                 
@@ -425,7 +468,6 @@
                         const close = quotes.close[index];
                         const volume = quotes.volume?.[index] || 0;
                         
-                        // Skip data points with null values
                         if (close === null || close === undefined || isNaN(close)) {
                             return null;
                         }
@@ -442,18 +484,26 @@
                     .filter(item => item !== null)
                     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-                console.log(`🔍 DEBUG: Processed data points: ${processedData.length}`);
-                console.log(`🔍 DEBUG: Date range in processed data: ${processedData[0]?.date} to ${processedData[processedData.length - 1]?.date}`);
-                console.log(`🔍 DEBUG: Sample processed data:`, processedData.slice(0, 3));
-                console.log(`🔍 DEBUG: Price range: ${Math.min(...processedData.map(d => d.close))} to ${Math.max(...processedData.map(d => d.close))}`);
+                if (processedData.length === 0) {
+                    throw new Error('No valid data points after processing');
+                }
 
-                return processedData;
+                return { data: processedData, isSimulated: false };
 
             } catch (error) {
-                console.error('🔍 DEBUG: Error in fetchDXYData:', error);
+                console.error('❌ DEBUG: Error in fetchDXYData:', error);
+
+                // Display error message to user
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.innerHTML = `⚠️ <b>Data Error:</b> Failed to fetch live data from Yahoo Finance. Showing simulated data instead.<br><small>Error: ${error.message}</small>`;
+                document.querySelector('.container').insertBefore(errorDiv, document.getElementById('metricsContainer'));
+
+                // Remove error message after 10 seconds
+                setTimeout(() => errorDiv.remove(), 10000);
+
                 console.log('🔍 DEBUG: Falling back to sample data');
-                // Fallback to sample data if API fails
-                return generateSampleData(period);
+                return { data: generateSampleData(period), isSimulated: true };
             }
         }
 
@@ -560,7 +610,7 @@
             return data;
         }
 
-        function updateMetrics(data) {
+        function updateMetrics(data, isSimulated = false) {
             console.log(`🔍 DEBUG: updateMetrics called with ${data?.length || 0} data points`);
             
             if (!data || data.length === 0) {
@@ -589,6 +639,7 @@
             });
             
             const metricsHtml = `
+                ${isSimulated ? '<div style="grid-column: 1 / -1; background: #fff3cd; color: #856404; padding: 5px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; margin-bottom: -10px;">⚠️ SIMULATED DATA</div>' : ''}
                 <div class="metric-card">
                     <div class="metric-label">Current DXY</div>
                     <div class="metric-value">${current.close.toFixed(2)}</div>
@@ -615,8 +666,8 @@
             document.getElementById('metricsContainer').innerHTML = metricsHtml;
         }
 
-        function createChart(data, showPresidential = false) {
-            console.log(`🔍 DEBUG: createChart called with ${data?.length || 0} data points, showPresidential: ${showPresidential}`);
+        function createChart(data, showPresidential = false, isSimulated = false) {
+            console.log(`🔍 DEBUG: createChart called with ${data?.length || 0} data points, showPresidential: ${showPresidential}, isSimulated: ${isSimulated}`);
             
             const dates = data.map(d => d.date);
             const prices = data.map(d => d.close);
@@ -642,11 +693,11 @@
 
             const layout = {
                 title: {
-                    text: 'U.S. Dollar Index (DXY)',
+                    text: isSimulated ? 'U.S. Dollar Index (DXY) - SIMULATED DATA' : 'U.S. Dollar Index (DXY)',
                     x: 0.5,
                     font: {
                         size: 20,
-                        color: 'black',
+                        color: isSimulated ? '#c0392b' : 'black',
                         family: 'Arial Black'
                     }
                 },
@@ -746,11 +797,31 @@
             document.getElementById('chart').innerHTML = '<div class="loading">Loading DXY data from Yahoo Finance...</div>';
             document.getElementById('metricsContainer').innerHTML = '<div class="loading">Loading metrics...</div>';
             
+            // Clear any existing simulation warning
+            const existingWarning = document.getElementById('simulationWarning');
+            if (existingWarning) existingWarning.remove();
+
             try {
-                // Fetch real data from Yahoo Finance API
-                currentData = await fetchDXYData(period);
-                updateMetrics(currentData);
-                createChart(currentData, showPresidential);
+                // Fetch data from Yahoo Finance API
+                const result = await fetchDXYData(period);
+                currentData = result.data;
+                const isSimulated = result.isSimulated;
+
+                if (isSimulated) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.id = 'simulationWarning';
+                    warningDiv.className = 'metric-card';
+                    warningDiv.style.gridColumn = '1 / -1';
+                    warningDiv.style.backgroundColor = '#fff3cd';
+                    warningDiv.style.border = '2px solid #ffc107';
+                    warningDiv.style.color = '#856404';
+                    warningDiv.style.fontWeight = 'bold';
+                    warningDiv.innerHTML = '⚠️ DATA STATUS: SIMULATED / OFFLINE MODE<br><span style="font-weight:normal; font-size: 0.9rem;">Unable to connect to live financial servers. The data shown below is generated for demonstration purposes.</span>';
+                    document.querySelector('.container').insertBefore(warningDiv, document.getElementById('metricsContainer'));
+                }
+
+                updateMetrics(currentData, isSimulated);
+                createChart(currentData, showPresidential, isSimulated);
             } catch (error) {
                 console.error('Error loading data:', error);
                 document.getElementById('chart').innerHTML = '<div class="error">Failed to load data. Please try again.</div>';
@@ -763,12 +834,30 @@
             const showPresidential = document.getElementById('showPresidential').checked;
             document.getElementById('presidentialLegend').style.display = showPresidential ? 'block' : 'none';
             if (currentData) {
-                createChart(currentData, showPresidential);
+                const isSimulated = !!document.getElementById('simulationWarning');
+                createChart(currentData, showPresidential, isSimulated);
             }
         });
         document.getElementById('refreshBtn').addEventListener('click', loadData);
 
+        // Check for file:// protocol and show warning if needed
+        function checkProtocol() {
+            if (window.location.protocol === 'file:') {
+                console.log('ℹ️ Running from local file. Some CORS proxies work better than others in this mode.');
+                const infoDiv = document.createElement('div');
+                infoDiv.style.padding = '10px';
+                infoDiv.style.marginBottom = '10px';
+                infoDiv.style.backgroundColor = '#e3f2fd';
+                infoDiv.style.border = '1px solid #2196f3';
+                infoDiv.style.borderRadius = '5px';
+                infoDiv.style.fontSize = '0.9rem';
+                infoDiv.innerHTML = 'ℹ️ <b>Local File Mode:</b> You are viewing this page as a local file. We are using specialized CORS proxies to fetch live financial data.';
+                document.querySelector('.container').insertBefore(infoDiv, document.querySelector('.controls'));
+            }
+        }
+
         // Initial load
+        checkProtocol();
         loadData();
     </script>
 </body>
