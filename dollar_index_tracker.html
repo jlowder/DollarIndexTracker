@@ -239,6 +239,75 @@
             background-color: rgba(200, 50, 50, 0.6);
         }
 
+        /* Loading Spinner & Status */
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(52, 152, 219, 0.1);
+            border-left-color: #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            backdrop-filter: blur(4px);
+        }
+
+        #loadingStatus {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-top: 15px;
+            font-size: 1.2rem;
+        }
+
+        #loadingDetail {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        #progressContainer {
+            width: 300px;
+            height: 16px;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 8px;
+            margin-top: 25px;
+            overflow: hidden;
+            display: none;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(to right, #3498db, #2980b9);
+            transition: width 0.4s ease-out;
+        }
+
+        .disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -255,6 +324,15 @@
     </style>
 </head>
 <body>
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingStatus">Fetching live financial data...</div>
+        <div id="loadingDetail">Connecting to Yahoo Finance...</div>
+        <div id="progressContainer">
+            <div id="progressBar"></div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>💲 U.S. Dollar Index (DXY) Interactive Chart</h1>
@@ -361,139 +439,249 @@
         let currentData = null;
         let currentChart = null;
 
+        // Persistent successful connection indices
+        let preferredProxyIndex = 0;
+        let preferredHostIndex = 0;
+        let preferredIntervalIndex = 0;
+
+        function updateLoadingDetail(text) {
+            const detail = document.getElementById('loadingDetail');
+            if (detail) detail.innerText = text;
+        }
+
+        /**
+         * Robust fetch function that tries multiple CORS proxies and Yahoo Finance endpoints
+         */
+        async function fetchWithFallback(yahooPath) {
+            const yahooHosts = [
+                'https://query2.finance.yahoo.com',
+                'https://query1.finance.yahoo.com'
+            ];
+
+            const proxies = [
+                {
+                    name: 'Direct (No Proxy)',
+                    getUrl: (url) => url,
+                    parse: (data) => data,
+                    timeout: 5000
+                },
+                {
+                    name: 'AllOrigins (Wrapped)',
+                    getUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                    parse: (data) => JSON.parse(data.contents),
+                    timeout: 15000
+                },
+                {
+                    name: 'AllOrigins (Raw)',
+                    getUrl: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                    parse: (data) => data,
+                    timeout: 10000
+                },
+                {
+                    name: 'CORSProxy.io',
+                    getUrl: (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                    parse: (data) => data,
+                    timeout: 8000
+                }
+            ];
+
+            // Reorder hosts and proxies based on preferred indices
+            const hostOrder = [preferredHostIndex, ...yahooHosts.map((_, i) => i).filter(i => i !== preferredHostIndex)];
+            const proxyOrder = [preferredProxyIndex, ...proxies.map((_, i) => i).filter(i => i !== preferredProxyIndex)];
+
+            let lastError = null;
+
+            for (const hostIdx of hostOrder) {
+                const host = yahooHosts[hostIdx];
+                const targetUrl = `${host}${yahooPath}`;
+
+                for (const proxyIdx of proxyOrder) {
+                    const proxy = proxies[proxyIdx];
+                    const proxyUrl = proxy.getUrl(targetUrl);
+                    console.log(`🔍 DEBUG: Trying ${proxy.name} with ${host}...`);
+
+                    const intervalLabel = yahooPath.includes('interval=1d') ? 'daily' :
+                                         (yahooPath.includes('interval=1wk') ? 'weekly' : 'monthly');
+                    updateLoadingDetail(`Trying ${proxy.name} (${intervalLabel})...`);
+
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), proxy.timeout);
+
+                        const response = await fetch(proxyUrl, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+
+                        if (!response.ok) {
+                            console.warn(`⚠️ DEBUG: ${proxy.name} returned status ${response.status} for ${host}`);
+                            lastError = new Error(`${proxy.name} returned status ${response.status}`);
+                            continue;
+                        }
+
+                        const rawData = await response.json();
+                        const data = proxy.parse(rawData);
+
+                        if (data && data.chart && !data.chart.error) {
+                            console.log(`✅ DEBUG: Successfully fetched data via ${proxy.name} from ${host}`);
+
+                            // Remember these successful indices
+                            preferredProxyIndex = proxyIdx;
+                            preferredHostIndex = hostIdx;
+
+                            return data;
+                        } else if (data && data.chart && data.chart.error) {
+                            console.warn(`⚠️ DEBUG: Yahoo API error via ${proxy.name}:`, data.chart.error);
+                        }
+                    } catch (e) {
+                        console.warn(`⚠️ DEBUG: ${proxy.name} failed:`, e.message);
+                        lastError = e;
+                    }
+                }
+            }
+
+            throw lastError || new Error('All fetch attempts failed');
+        }
+
         // Fetch real DXY data from Yahoo Finance API
         async function fetchDXYData(period) {
             console.log(`🔍 DEBUG: Starting fetchDXYData for period: ${period}`);
             
-            try {
-                // Calculate date range for Yahoo Finance API
-                const { startDate, endDate } = calculateDateRange(period);
-                console.log(`🔍 DEBUG: Date range: ${startDate} to ${endDate}`);
-                
-                // Convert dates to Unix timestamps for Yahoo Finance
-                const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-                const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
-                
-                console.log(`🔍 DEBUG: Using Yahoo Finance for DXY (^DXY) data`);
-                
-                // Try Yahoo Finance with different symbol format
-                const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?period1=${startTimestamp}&period2=${endTimestamp}&interval=1d&includePrePost=false`;
-                const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
-                console.log(`🔍 DEBUG: Making Yahoo Finance API call via CORS proxy (DX=F): ${url}`);
-                
-                const response = await fetch(url);
-                console.log(`🔍 DEBUG: Response status: ${response.status}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                console.log(`🔍 DEBUG: Raw Yahoo Finance API response:`, data);
-                
-                // Check for Yahoo Finance API errors
-                if (data.chart?.error) {
-                    console.error(`🔍 DEBUG: Yahoo Finance API error:`, data.chart.error);
-                    throw new Error(data.chart.error.description || 'Yahoo Finance API returned an error');
-                }
-                
-                const result = data.chart?.result?.[0];
-                if (!result) {
-                    console.error(`🔍 DEBUG: No chart result found. Response structure:`, Object.keys(data));
-                    throw new Error('No chart data found in Yahoo Finance response');
-                }
-                
-                console.log(`🔍 DEBUG: Chart result structure:`, Object.keys(result));
-                
-                const timestamps = result.timestamp;
-                const quotes = result.indicators?.quote?.[0];
-                
-                if (!timestamps || !quotes || !quotes.close) {
-                    console.error(`🔍 DEBUG: Missing required data. Timestamps:`, !!timestamps, 'Quotes:', !!quotes, 'Close prices:', !!quotes?.close);
-                    throw new Error('Missing required data in Yahoo Finance response');
-                }
-                
-                console.log(`🔍 DEBUG: Found ${timestamps.length} data points`);
-                
-                // Convert Yahoo Finance response to our format
-                const processedData = timestamps
-                    .map((timestamp, index) => {
-                        const date = new Date(timestamp * 1000).toISOString().split('T')[0];
-                        const open = quotes.open?.[index] || quotes.close[index];
-                        const high = quotes.high?.[index] || quotes.close[index];
-                        const low = quotes.low?.[index] || quotes.close[index];
-                        const close = quotes.close[index];
-                        const volume = quotes.volume?.[index] || 0;
-                        
-                        // Skip data points with null values
-                        if (close === null || close === undefined || isNaN(close)) {
-                            return null;
+            const chunks = calculateChunks(period);
+            const totalChunks = chunks.length;
+            const progressBar = document.getElementById('progressBar');
+            const progressContainer = document.getElementById('progressContainer');
+
+            // Always show progress container and set initial small width
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '5%';
+
+            const allData = [];
+            let lastFetchError = null;
+
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const intervals = ['1d', '1wk', '1mo'];
+
+                // Reorder intervals based on preferred index
+                const intervalOrder = [preferredIntervalIndex, ...intervals.map((_, idx) => idx).filter(idx => idx !== preferredIntervalIndex)];
+
+                let chunkSuccess = false;
+
+                // Always update slice status text and progress bar
+                document.getElementById('loadingStatus').innerText = `Fetching data slice ${i + 1} of ${totalChunks}...`;
+                const startProgress = (i / totalChunks) * 100 + (1 / totalChunks) * 10;
+                progressBar.style.width = `${startProgress}%`;
+
+                for (const intervalIdx of intervalOrder) {
+                    const interval = intervals[intervalIdx];
+                    try {
+                        const yahooPath = `/v8/finance/chart/DX-Y.NYB?period1=${chunk.start}&period2=${chunk.end}&interval=${interval}&includePrePost=false`;
+                        const data = await fetchWithFallback(yahooPath);
+
+                        const result = data.chart?.result?.[0];
+                        if (!result) throw new Error('No chart data found');
+
+                        const timestamps = result.timestamp;
+                        const quotes = result.indicators?.quote?.[0];
+                        if (!timestamps || !quotes || !quotes.close) throw new Error('Missing required data');
+
+                        const formatPrice = (val, fallback) => parseFloat((val ?? fallback).toFixed(2));
+                        const processedData = timestamps
+                            .map((timestamp, index) => {
+                                const close = quotes.close[index];
+                                if (close === null || close === undefined || isNaN(close)) return null;
+                                return {
+                                    date: new Date(timestamp * 1000).toISOString().split('T')[0],
+                                    open: formatPrice(quotes.open?.[index], close),
+                                    high: formatPrice(quotes.high?.[index], close),
+                                    low: formatPrice(quotes.low?.[index], close),
+                                    close: formatPrice(close, close),
+                                    volume: Math.floor(quotes.volume?.[index] || 0)
+                                };
+                            })
+                            })
+                            .filter(item => item !== null);
+
+                        if (processedData.length > 0) {
+                            allData.push(...processedData);
+                            chunkSuccess = true;
+
+                            // Remember successful interval
+                            preferredIntervalIndex = intervalIdx;
+
+                            const endProgress = ((i + 1) / totalChunks) * 100;
+                            progressBar.style.width = `${endProgress}%`;
+
+                            break; // Successfully fetched this chunk
                         }
-                        
-                        return {
-                            date,
-                            open: parseFloat((open || close).toFixed(2)),
-                            high: parseFloat((high || close).toFixed(2)),
-                            low: parseFloat((low || close).toFixed(2)),
-                            close: parseFloat(close.toFixed(2)),
-                            volume: Math.floor(volume)
-                        };
-                    })
-                    .filter(item => item !== null)
-                    .sort((a, b) => new Date(a.date) - new Date(b.date));
+                    } catch (error) {
+                        console.warn(`⚠️ DEBUG: Fetch for chunk ${i+1} with interval ${interval} failed:`, error.message);
+                        lastFetchError = error;
+                    }
+                }
 
-                console.log(`🔍 DEBUG: Processed data points: ${processedData.length}`);
-                console.log(`🔍 DEBUG: Date range in processed data: ${processedData[0]?.date} to ${processedData[processedData.length - 1]?.date}`);
-                console.log(`🔍 DEBUG: Sample processed data:`, processedData.slice(0, 3));
-                console.log(`🔍 DEBUG: Price range: ${Math.min(...processedData.map(d => d.close))} to ${Math.max(...processedData.map(d => d.close))}`);
-
-                return processedData;
-
-            } catch (error) {
-                console.error('🔍 DEBUG: Error in fetchDXYData:', error);
-                console.log('🔍 DEBUG: Falling back to sample data');
-                // Fallback to sample data if API fails
-                return generateSampleData(period);
+                if (!chunkSuccess) {
+                    console.error(`❌ DEBUG: Failed to fetch chunk ${i + 1}`);
+                    throw lastFetchError || new Error(`Failed to fetch data slice ${i + 1}`);
+                }
             }
+
+            // Deduplicate and sort
+            const uniqueData = Array.from(new Map(allData.map(item => [item.date, item])).values())
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (uniqueData.length === 0) {
+                throw new Error('No valid data points after processing all chunks');
+            }
+
+            return { data: uniqueData, isSimulated: false };
         }
 
-        // Calculate date range for Yahoo Finance API
-        function calculateDateRange(period) {
-            const now = new Date();
-            const endDate = now.toISOString().split('T')[0];
-            let startDate;
-            
+        // Calculate time chunks (2-year slices) for a given period
+        function calculateChunks(period) {
+            const now = Math.floor(Date.now() / 1000);
+            let startTime;
+
             switch(period) {
-                case '1mo': 
-                    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '3mo': 
-                    startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '6mo': 
-                    startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '1y': 
-                    startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '2y': 
-                    startDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '5y': 
-                    startDate = new Date(now.getTime() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '10y': 
-                    startDate = new Date(now.getTime() - 10 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case 'max': 
-                    startDate = '1990-01-01'; // Yahoo Finance DXY data goes back to early 1990s
-                    break;
-                default:
-                    startDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                case '1mo': startTime = now - (30 * 24 * 60 * 60); break;
+                case '3mo': startTime = now - (90 * 24 * 60 * 60); break;
+                case '6mo': startTime = now - (180 * 24 * 60 * 60); break;
+                case '1y': startTime = now - (365 * 24 * 60 * 60); break;
+                case '2y': startTime = now - (2 * 365 * 24 * 60 * 60); break;
+                case '5y': startTime = now - (5 * 365 * 24 * 60 * 60); break;
+                case '10y': startTime = now - (10 * 365 * 24 * 60 * 60); break;
+                case 'max': startTime = Math.floor(new Date('1990-01-01').getTime() / 1000); break;
+                default: startTime = now - (2 * 365 * 24 * 60 * 60);
+            }
+
+            const chunks = [];
+            const SECONDS_IN_TWO_YEARS = 2 * 365 * 24 * 60 * 60;
+
+            let currentStart = startTime;
+            while (currentStart < now) {
+                let currentEnd = Math.min(currentStart + SECONDS_IN_TWO_YEARS, now);
+                chunks.push({ start: currentStart, end: currentEnd });
+                currentStart = currentEnd + 1;
             }
             
-            return { startDate, endDate };
+            return chunks;
         }
+
+        async function handleFetchError(period, error) {
+            console.error('❌ DEBUG: All fetch attempts failed for fetchDXYData:', error);
+
+            // Display error message to user
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `⚠️ <b>Data Error:</b> Failed to fetch live data from Yahoo Finance. Showing simulated data instead.<br><small>Error: ${error?.message || 'Unknown error'}</small>`;
+            document.querySelector('.container').insertBefore(errorDiv, document.getElementById('metricsContainer'));
+
+            // Remove error message after 10 seconds
+            setTimeout(() => errorDiv.remove(), 10000);
+
+            console.log('🔍 DEBUG: Falling back to sample data');
+            return { data: generateSampleData(period), isSimulated: true };
+        }
+
 
 
         // Filter data based on selected time period
@@ -560,7 +748,7 @@
             return data;
         }
 
-        function updateMetrics(data) {
+        function updateMetrics(data, isSimulated = false) {
             console.log(`🔍 DEBUG: updateMetrics called with ${data?.length || 0} data points`);
             
             if (!data || data.length === 0) {
@@ -589,6 +777,7 @@
             });
             
             const metricsHtml = `
+                ${isSimulated ? '<div style="grid-column: 1 / -1; background: #fff3cd; color: #856404; padding: 5px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; margin-bottom: -10px;">⚠️ SIMULATED DATA</div>' : ''}
                 <div class="metric-card">
                     <div class="metric-label">Current DXY</div>
                     <div class="metric-value">${current.close.toFixed(2)}</div>
@@ -615,8 +804,8 @@
             document.getElementById('metricsContainer').innerHTML = metricsHtml;
         }
 
-        function createChart(data, showPresidential = false) {
-            console.log(`🔍 DEBUG: createChart called with ${data?.length || 0} data points, showPresidential: ${showPresidential}`);
+        function createChart(data, showPresidential = false, isSimulated = false) {
+            console.log(`🔍 DEBUG: createChart called with ${data?.length || 0} data points, showPresidential: ${showPresidential}, isSimulated: ${isSimulated}`);
             
             const dates = data.map(d => d.date);
             const prices = data.map(d => d.close);
@@ -642,11 +831,11 @@
 
             const layout = {
                 title: {
-                    text: 'U.S. Dollar Index (DXY)',
+                    text: isSimulated ? 'U.S. Dollar Index (DXY) - SIMULATED DATA' : 'U.S. Dollar Index (DXY)',
                     x: 0.5,
                     font: {
                         size: 20,
-                        color: 'black',
+                        color: isSimulated ? '#c0392b' : 'black',
                         family: 'Arial Black'
                     }
                 },
@@ -743,17 +932,54 @@
             const showPresidential = document.getElementById('showPresidential').checked;
             
             // Show loading state
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+            document.getElementById('refreshBtn').classList.add('disabled');
+            document.getElementById('timePeriod').classList.add('disabled');
+
             document.getElementById('chart').innerHTML = '<div class="loading">Loading DXY data from Yahoo Finance...</div>';
             document.getElementById('metricsContainer').innerHTML = '<div class="loading">Loading metrics...</div>';
             
+            // Clear any existing simulation warning
+            const existingWarning = document.getElementById('simulationWarning');
+            if (existingWarning) existingWarning.remove();
+
+            let result;
             try {
-                // Fetch real data from Yahoo Finance API
-                currentData = await fetchDXYData(period);
-                updateMetrics(currentData);
-                createChart(currentData, showPresidential);
+                // Fetch data from Yahoo Finance API
+                result = await fetchDXYData(period);
             } catch (error) {
-                console.error('Error loading data:', error);
-                document.getElementById('chart').innerHTML = '<div class="error">Failed to load data. Please try again.</div>';
+                result = await handleFetchError(period, error);
+            }
+
+            try {
+                currentData = result.data;
+                const isSimulated = result.isSimulated;
+
+                if (isSimulated) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.id = 'simulationWarning';
+                    warningDiv.className = 'metric-card';
+                    warningDiv.style.gridColumn = '1 / -1';
+                    warningDiv.style.backgroundColor = '#fff3cd';
+                    warningDiv.style.border = '2px solid #ffc107';
+                    warningDiv.style.color = '#856404';
+                    warningDiv.style.fontWeight = 'bold';
+                    warningDiv.innerHTML = '⚠️ DATA STATUS: SIMULATED / OFFLINE MODE<br><span style="font-weight:normal; font-size: 0.9rem;">Unable to connect to live financial servers. The data shown below is generated for demonstration purposes.</span>';
+                    document.querySelector('.container').insertBefore(warningDiv, document.getElementById('metricsContainer'));
+                }
+
+                updateMetrics(currentData, isSimulated);
+                createChart(currentData, showPresidential, isSimulated);
+            } catch (innerError) {
+                console.error('Error processing data:', innerError);
+                const chartDiv = document.getElementById('chart');
+                chartDiv.innerHTML = '<div class="error">Error rendering chart: <span id="errorMessage"></span></div>';
+                document.getElementById('errorMessage').textContent = innerError.message;
+            } finally {
+                overlay.style.display = 'none';
+                document.getElementById('refreshBtn').classList.remove('disabled');
+                document.getElementById('timePeriod').classList.remove('disabled');
             }
         }
 
@@ -763,12 +989,31 @@
             const showPresidential = document.getElementById('showPresidential').checked;
             document.getElementById('presidentialLegend').style.display = showPresidential ? 'block' : 'none';
             if (currentData) {
-                createChart(currentData, showPresidential);
+                const isSimulated = !!document.getElementById('simulationWarning');
+                createChart(currentData, showPresidential, isSimulated);
             }
         });
         document.getElementById('refreshBtn').addEventListener('click', loadData);
 
+        // Check for file:// protocol and show warning if needed
+        function checkProtocol() {
+            if (window.location.protocol === 'file:') {
+                console.log('ℹ️ Running from local file. Some CORS proxies work better than others in this mode.');
+                const infoDiv = document.createElement('div');
+                infoDiv.id = 'file-protocol-notice';
+                infoDiv.style.padding = '10px';
+                infoDiv.style.marginBottom = '10px';
+                infoDiv.style.backgroundColor = '#e3f2fd';
+                infoDiv.style.border = '1px solid #2196f3';
+                infoDiv.style.borderRadius = '5px';
+                infoDiv.style.fontSize = '0.9rem';
+                infoDiv.innerHTML = 'ℹ️ <b>Local File Mode:</b> You are viewing this page as a local file. We are using specialized CORS proxies to fetch live financial data.';
+                document.querySelector('.container').insertBefore(infoDiv, document.querySelector('.controls'));
+            }
+        }
+
         // Initial load
+        checkProtocol();
         loadData();
     </script>
 </body>
