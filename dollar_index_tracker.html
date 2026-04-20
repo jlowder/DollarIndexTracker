@@ -365,27 +365,36 @@
          * Robust fetch function that tries multiple CORS proxies and Yahoo Finance endpoints
          */
         async function fetchWithFallback(yahooPath) {
+            const yahooHosts = [
+                'https://query2.finance.yahoo.com',
+                'https://query1.finance.yahoo.com'
+            ];
+
             const proxies = [
+                {
+                    name: 'Direct (No Proxy)',
+                    getUrl: (url) => url,
+                    parse: (data) => data,
+                    timeout: 2000
+                },
                 {
                     name: 'AllOrigins (Wrapped)',
                     getUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-                    parse: (data) => JSON.parse(data.contents)
+                    parse: (data) => JSON.parse(data.contents),
+                    timeout: 15000
                 },
                 {
                     name: 'AllOrigins (Raw)',
                     getUrl: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-                    parse: (data) => data
+                    parse: (data) => data,
+                    timeout: 10000
                 },
                 {
-                    name: 'CodeTabs (Raw)',
-                    getUrl: (url) => `https://api.codetabs.com/v1/proxy/?url=${encodeURIComponent(url)}`,
-                    parse: (data) => data
+                    name: 'CORSProxy.io',
+                    getUrl: (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                    parse: (data) => data,
+                    timeout: 8000
                 }
-            ];
-
-            const yahooHosts = [
-                'https://query2.finance.yahoo.com',
-                'https://query1.finance.yahoo.com'
             ];
 
             let lastError = null;
@@ -399,13 +408,14 @@
 
                     try {
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+                        const timeoutId = setTimeout(() => controller.abort(), proxy.timeout);
 
                         const response = await fetch(proxyUrl, { signal: controller.signal });
                         clearTimeout(timeoutId);
 
                         if (!response.ok) {
-                            console.warn(`⚠️ DEBUG: ${proxy.name} returned status ${response.status}`);
+                            console.warn(`⚠️ DEBUG: ${proxy.name} returned status ${response.status} for ${host}`);
+                            lastError = new Error(`${proxy.name} returned status ${response.status}`);
                             continue;
                         }
 
@@ -432,118 +442,87 @@
         async function fetchDXYData(period) {
             console.log(`🔍 DEBUG: Starting fetchDXYData for period: ${period}`);
             
-            try {
-                // Calculate date range for Yahoo Finance API
-                const { startDate, endDate } = calculateDateRange(period);
-                
-                // Convert dates to Unix timestamps for Yahoo Finance
-                const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-                const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
-                
-                const yahooPath = `/v8/finance/chart/DX-Y.NYB?period1=${startTimestamp}&period2=${endTimestamp}&interval=1d&includePrePost=false`;
-                
-                const data = await fetchWithFallback(yahooPath);
-                
-                const result = data.chart?.result?.[0];
-                if (!result) {
-                    throw new Error('No chart data found in Yahoo Finance response');
-                }
-                
-                const timestamps = result.timestamp;
-                const quotes = result.indicators?.quote?.[0];
-                
-                if (!timestamps || !quotes || !quotes.close) {
-                    throw new Error('Missing required data in Yahoo Finance response');
-                }
-                
-                console.log(`🔍 DEBUG: Found ${timestamps.length} data points`);
-                
-                // Convert Yahoo Finance response to our format
-                const processedData = timestamps
-                    .map((timestamp, index) => {
-                        const date = new Date(timestamp * 1000).toISOString().split('T')[0];
-                        const open = quotes.open?.[index] || quotes.close[index];
-                        const high = quotes.high?.[index] || quotes.close[index];
-                        const low = quotes.low?.[index] || quotes.close[index];
-                        const close = quotes.close[index];
-                        const volume = quotes.volume?.[index] || 0;
-                        
-                        if (close === null || close === undefined || isNaN(close)) {
-                            return null;
-                        }
-                        
-                        return {
-                            date,
-                            open: parseFloat((open || close).toFixed(2)),
-                            high: parseFloat((high || close).toFixed(2)),
-                            low: parseFloat((low || close).toFixed(2)),
-                            close: parseFloat(close.toFixed(2)),
-                            volume: Math.floor(volume)
-                        };
-                    })
-                    .filter(item => item !== null)
-                    .sort((a, b) => new Date(a.date) - new Date(b.date));
+            const intervalsToTry = ['1d', '1wk', '1mo'];
+            let lastFetchError = null;
 
-                if (processedData.length === 0) {
-                    throw new Error('No valid data points after processing');
+            for (const interval of intervalsToTry) {
+                // Skip daily interval for periods > 2 years to avoid large payloads that crash proxies
+                if (interval === '1d' && ['5y', '10y', 'max'].includes(period)) {
+                    console.log(`🔍 DEBUG: Skipping 1d interval for ${period} to avoid proxy timeout`);
+                    continue;
                 }
 
-                return { data: processedData, isSimulated: false };
+                try {
+                    console.log(`🔍 DEBUG: Attempting fetch with interval: ${interval}`);
+                    const yahooPath = `/v8/finance/chart/DX-Y.NYB?range=${period}&interval=${interval}&includePrePost=false`;
+                    const data = await fetchWithFallback(yahooPath);
+                
+                    const result = data.chart?.result?.[0];
+                    if (!result) {
+                        throw new Error('No chart data found in Yahoo Finance response');
+                    }
+                
+                    const timestamps = result.timestamp;
+                    const quotes = result.indicators?.quote?.[0];
 
-            } catch (error) {
-                console.error('❌ DEBUG: Error in fetchDXYData:', error);
+                    if (!timestamps || !quotes || !quotes.close) {
+                        throw new Error('Missing required data in Yahoo Finance response');
+                    }
 
-                // Display error message to user
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'error';
-                errorDiv.innerHTML = `⚠️ <b>Data Error:</b> Failed to fetch live data from Yahoo Finance. Showing simulated data instead.<br><small>Error: ${error.message}</small>`;
-                document.querySelector('.container').insertBefore(errorDiv, document.getElementById('metricsContainer'));
+                    console.log(`🔍 DEBUG: Found ${timestamps.length} data points`);
 
-                // Remove error message after 10 seconds
-                setTimeout(() => errorDiv.remove(), 10000);
+                    // Convert Yahoo Finance response to our format
+                    const processedData = timestamps
+                        .map((timestamp, index) => {
+                            const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+                            const open = quotes.open?.[index] || quotes.close[index];
+                            const high = quotes.high?.[index] || quotes.close[index];
+                            const low = quotes.low?.[index] || quotes.close[index];
+                            const close = quotes.close[index];
+                            const volume = quotes.volume?.[index] || 0;
 
-                console.log('🔍 DEBUG: Falling back to sample data');
-                return { data: generateSampleData(period), isSimulated: true };
+                            if (close === null || close === undefined || isNaN(close)) {
+                                return null;
+                            }
+
+                            return {
+                                date,
+                                open: parseFloat((open || close).toFixed(2)),
+                                high: parseFloat((high || close).toFixed(2)),
+                                low: parseFloat((low || close).toFixed(2)),
+                                close: parseFloat(close.toFixed(2)),
+                                volume: Math.floor(volume)
+                            };
+                        })
+                        .filter(item => item !== null)
+                        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                    if (processedData.length === 0) {
+                        throw new Error('No valid data points after processing');
+                    }
+
+                    return { data: processedData, isSimulated: false };
+                } catch (error) {
+                    console.warn(`⚠️ DEBUG: Fetch with interval ${interval} failed:`, error.message);
+                    lastFetchError = error;
+                }
             }
+
+            console.error('❌ DEBUG: All fetch attempts failed for fetchDXYData');
+            
+            // Display error message to user
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `⚠️ <b>Data Error:</b> Failed to fetch live data from Yahoo Finance. Showing simulated data instead.<br><small>Error: ${lastFetchError?.message || 'Unknown error'}</small>`;
+            document.querySelector('.container').insertBefore(errorDiv, document.getElementById('metricsContainer'));
+            
+            // Remove error message after 10 seconds
+            setTimeout(() => errorDiv.remove(), 10000);
+
+            console.log('🔍 DEBUG: Falling back to sample data');
+            return { data: generateSampleData(period), isSimulated: true };
         }
 
-        // Calculate date range for Yahoo Finance API
-        function calculateDateRange(period) {
-            const now = new Date();
-            const endDate = now.toISOString().split('T')[0];
-            let startDate;
-            
-            switch(period) {
-                case '1mo': 
-                    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '3mo': 
-                    startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '6mo': 
-                    startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '1y': 
-                    startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '2y': 
-                    startDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '5y': 
-                    startDate = new Date(now.getTime() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case '10y': 
-                    startDate = new Date(now.getTime() - 10 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                    break;
-                case 'max': 
-                    startDate = '1990-01-01'; // Yahoo Finance DXY data goes back to early 1990s
-                    break;
-                default:
-                    startDate = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            }
-            
-            return { startDate, endDate };
-        }
 
 
         // Filter data based on selected time period
