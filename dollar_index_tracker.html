@@ -286,19 +286,21 @@
 
         #progressContainer {
             width: 300px;
-            height: 10px;
-            background: #eee;
-            border-radius: 5px;
-            margin-top: 20px;
+            height: 14px;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 7px;
+            margin-top: 25px;
             overflow: hidden;
             display: none;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
         }
 
         #progressBar {
             width: 0%;
             height: 100%;
-            background: #3498db;
-            transition: width 0.3s ease;
+            background: linear-gradient(to right, #3498db, #2980b9);
+            transition: width 0.4s ease-out;
         }
 
         .disabled {
@@ -440,6 +442,7 @@
         // Persistent successful connection indices
         let preferredProxyIndex = 0;
         let preferredHostIndex = 0;
+        let preferredIntervalIndex = 0;
 
         function updateLoadingDetail(text) {
             const detail = document.getElementById('loadingDetail');
@@ -496,7 +499,10 @@
                     const proxy = proxies[proxyIdx];
                     const proxyUrl = proxy.getUrl(targetUrl);
                     console.log(`🔍 DEBUG: Trying ${proxy.name} with ${host}...`);
-                    updateLoadingDetail(`Trying ${proxy.name}...`);
+
+                    const intervalLabel = yahooPath.includes('interval=1d') ? 'daily' :
+                                         (yahooPath.includes('interval=1wk') ? 'weekly' : 'monthly');
+                    updateLoadingDetail(`Trying ${proxy.name} (${intervalLabel})...`);
 
                     try {
                         const controller = new AbortController();
@@ -556,14 +562,19 @@
 
             for (let i = 0; i < chunks.length; i++) {
                 const chunk = chunks[i];
-                const intervalsToTry = ['1d', '1wk', '1mo'];
+                const intervals = ['1d', '1wk', '1mo'];
+
+                // Reorder intervals based on preferred index
+                const intervalOrder = [preferredIntervalIndex, ...intervals.map((_, idx) => idx).filter(idx => idx !== preferredIntervalIndex)];
+
                 let chunkSuccess = false;
 
                 if (totalChunks > 1) {
-                    updateLoadingDetail(`Fetching data chunk ${i + 1} of ${totalChunks}...`);
+                    document.getElementById('loadingStatus').innerText = `Fetching data slice ${i + 1} of ${totalChunks}...`;
                 }
 
-                for (const interval of intervalsToTry) {
+                for (const intervalIdx of intervalOrder) {
+                    const interval = intervals[intervalIdx];
                     try {
                         const yahooPath = `/v8/finance/chart/DX-Y.NYB?period1=${chunk.start}&period2=${chunk.end}&interval=${interval}&includePrePost=false`;
                         const data = await fetchWithFallback(yahooPath);
@@ -593,6 +604,9 @@
                         if (processedData.length > 0) {
                             allData.push(...processedData);
                             chunkSuccess = true;
+
+                            // Remember successful interval
+                            preferredIntervalIndex = intervalIdx;
 
                             if (totalChunks > 1) {
                                 const progress = ((i + 1) / totalChunks) * 100;
@@ -985,6 +999,7 @@
             if (window.location.protocol === 'file:') {
                 console.log('ℹ️ Running from local file. Some CORS proxies work better than others in this mode.');
                 const infoDiv = document.createElement('div');
+                infoDiv.id = 'file-protocol-notice';
                 infoDiv.style.padding = '10px';
                 infoDiv.style.marginBottom = '10px';
                 infoDiv.style.backgroundColor = '#e3f2fd';

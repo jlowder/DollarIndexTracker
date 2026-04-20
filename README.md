@@ -4,8 +4,9 @@ An interactive, self-contained web application for visualizing U.S. Dollar Index
 
 ## Features
 
-- **Real-time DXY data**: Fetches data from Yahoo Finance via robust CORS proxies with multiple fallback mechanisms.
-- **Offline/Simulated Mode**: Automatically falls back to high-quality simulated data if live financial servers are unreachable.
+- **Real-time DXY data**: Fetches data from Yahoo Finance via robust CORS proxies with multiple fallback mechanisms and intelligent "Smart Selection" to prioritize successful connection paths.
+- **Chunked Data Loading**: Efficiently retrieves high-resolution daily data for long historical periods (5y, 10y, Max) by automatically slicing requests into manageable 2-year chunks to avoid proxy timeouts.
+- **Offline/Simulated Mode**: Automatically falls back to high-quality simulated data if live financial servers are unreachable, with clear UI indicators.
 - **Interactive charts**: Zoom and pan capabilities powered by Plotly.js.
 - **Presidential Overlays**: Toggle visibility of U.S. presidential terms to see historical context.
 - **Multiple time periods**: Select from 1 month to "All Time" (back to the 1990s).
@@ -39,7 +40,8 @@ Then visit `http://localhost:8000` (or the port provided).
 - **Frontend**: HTML5, CSS3, and Vanilla JavaScript.
 - **Charting Library**: [Plotly.js](https://plotly.com/javascript/)
 - **Data Source**: Yahoo Finance (ticker: `DX-Y.NYB`)
-- **CORS Mitigation**: Employs a `fetchWithFallback` mechanism that cycles through multiple proxies (AllOrigins, CodeTabs) and Yahoo endpoints (query1, query2) to ensure data reliability, even when loaded via the `file://` protocol.
+- **CORS Mitigation**: Employs a `fetchWithFallback` mechanism that cycles through multiple proxies (AllOrigins, CORSProxy.io) and Yahoo endpoints (query1, query2) to ensure data reliability, even when loaded via the `file://` protocol.
+- **Visual Feedback**: Includes a detailed loading overlay with a progress bar and status text that tracks data slice acquisition and proxy connection attempts.
 
 ## Simulated Data & Offline Mode
 
