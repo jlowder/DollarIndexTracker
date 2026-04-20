@@ -1,79 +1,44 @@
 # U.S. Dollar Index (DXY) Interactive Chart
 
-An interactive Streamlit web application for visualizing U.S. Dollar Index data with zoom and pan functionality.
+An interactive, self-contained web application for visualizing U.S. Dollar Index data with zoom and pan functionality, along with historical presidential term overlays.
 
 ## Features
 
-- Real-time DXY data from Yahoo Finance
-- Interactive charts with zoom and pan
-- Multiple time period selections (1M, 3M, 6M, 1Y, 2Y, 5Y, 10Y, All)
-- Key metrics display (current price, daily change, 52W high/low)
-- Range selector buttons for quick navigation
-- Auto-refresh functionality
-- Raw data table view
+- **Real-time DXY data**: Fetches data from Yahoo Finance via a CORS proxy.
+- **Interactive charts**: Zoom and pan capabilities powered by Plotly.js.
+- **Presidential Overlays**: Toggle visibility of U.S. presidential terms to see historical context.
+- **Multiple time periods**: Select from 1 month to "All Time" (back to the 1990s).
+- **Key metrics**: Displays current price, daily change, and 52-week high/low.
+- **Zero dependencies**: No backend server or Python environment required.
 
-## Docker Deployment
+## How to Run
 
-### Prerequisites
+Since this is a self-contained HTML application, you can run it in several ways:
 
-- Docker installed on your server
-- Docker Compose (optional but recommended)
+### Option 1: Direct Open
+Simply open `dollar_index_tracker.html` in any modern web browser.
 
-### Option 1: Using Docker Compose (Recommended)
+### Option 2: Local Web Server
+For a better experience, you can serve it using a simple local server:
 
-1. Clone or download all files to your server
-2. Run the application:
-
+**Using Python:**
 ```bash
-docker-compose up -d
+python -m http.server 8000
 ```
 
-3. Access the application at `http://your-server-ip:8501`
-
-### Option 2: Using Docker directly
-
-1. Build the Docker image:
-
+**Using Node.js (npx):**
 ```bash
-docker build -t dxy-chart .
+npx serve .
 ```
 
-2. Run the container:
+Then visit `http://localhost:8000` (or the port provided).
 
-```bash
-docker run -d -p 8501:5000 --name dxy-app dxy-chart
-```
+## Technical Details
 
-3. Access the application at `http://your-server-ip:8501`
-
-### Configuration
-
-The application runs on port 5000 by default. To change the port, modify:
-
-- `docker-compose.yml`: Change the port mapping (e.g., `"8080:5000"`)
-- Or use Docker run with different port: `docker run -d -p 8080:5000 dxy-chart`
-
-### Management Commands
-
-```bash
-# View logs
-docker-compose logs -f
-
-# Stop the application
-docker-compose down
-
-# Restart the application
-docker-compose restart
-
-# Update the application
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-## Data Source
-
-The application fetches real-time U.S. Dollar Index data from Yahoo Finance (DX-Y.NYB ticker).
+- **Frontend**: HTML5, CSS3, and Vanilla JavaScript.
+- **Charting Library**: [Plotly.js](https://plotly.com/javascript/)
+- **Data Source**: Yahoo Finance (ticker: `DX-Y.NYB`)
+- **CORS Proxy**: Uses `allorigins.win` to fetch data directly from the browser.
 
 ## About the Dollar Index
 
@@ -86,9 +51,5 @@ The U.S. Dollar Index (DXY) measures the value of the United States dollar relat
 - Swedish Krona (SEK): 4.2%
 - Swiss Franc (CHF): 3.6%
 
-## Technical Details
-
-- Built with Streamlit and Plotly
-- Python 3.11 runtime
-- Automatic data caching (5-minute intervals)
-- Health checks included for production monitoring
+---
+*Disclaimer: This application is for informational purposes only and should not be considered as financial advice.*
