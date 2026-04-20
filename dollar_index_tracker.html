@@ -584,18 +584,20 @@
                         const quotes = result.indicators?.quote?.[0];
                         if (!timestamps || !quotes || !quotes.close) throw new Error('Missing required data');
 
+                        const formatPrice = (val, fallback) => parseFloat((val ?? fallback).toFixed(2));
                         const processedData = timestamps
                             .map((timestamp, index) => {
                                 const close = quotes.close[index];
                                 if (close === null || close === undefined || isNaN(close)) return null;
                                 return {
                                     date: new Date(timestamp * 1000).toISOString().split('T')[0],
-                                    open: parseFloat((quotes.open?.[index] || close).toFixed(2)),
-                                    high: parseFloat((quotes.high?.[index] || close).toFixed(2)),
-                                    low: parseFloat((quotes.low?.[index] || close).toFixed(2)),
-                                    close: parseFloat(close.toFixed(2)),
+                                    open: formatPrice(quotes.open?.[index], close),
+                                    high: formatPrice(quotes.high?.[index], close),
+                                    low: formatPrice(quotes.low?.[index], close),
+                                    close: formatPrice(close, close),
                                     volume: Math.floor(quotes.volume?.[index] || 0)
                                 };
+                            })
                             })
                             .filter(item => item !== null);
 
