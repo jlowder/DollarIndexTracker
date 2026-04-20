@@ -262,20 +262,20 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.95);
             z-index: 1000;
             justify-content: center;
             align-items: center;
             flex-direction: column;
             text-align: center;
-            backdrop-filter: blur(2px);
+            backdrop-filter: blur(4px);
         }
 
         #loadingStatus {
             font-weight: bold;
             color: #2c3e50;
-            margin-top: 10px;
-            font-size: 1.1rem;
+            margin-top: 15px;
+            font-size: 1.2rem;
         }
 
         #loadingDetail {
@@ -286,10 +286,10 @@
 
         #progressContainer {
             width: 300px;
-            height: 14px;
+            height: 16px;
             background: #ecf0f1;
             border: 1px solid #bdc3c7;
-            border-radius: 7px;
+            border-radius: 8px;
             margin-top: 25px;
             overflow: hidden;
             display: none;
@@ -550,12 +550,9 @@
             const progressBar = document.getElementById('progressBar');
             const progressContainer = document.getElementById('progressContainer');
 
-            if (totalChunks > 1) {
-                progressContainer.style.display = 'block';
-                progressBar.style.width = '0%';
-            } else {
-                progressContainer.style.display = 'none';
-            }
+            // Always show progress container and set initial small width
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '5%';
 
             const allData = [];
             let lastFetchError = null;
@@ -569,9 +566,10 @@
 
                 let chunkSuccess = false;
 
-                if (totalChunks > 1) {
-                    document.getElementById('loadingStatus').innerText = `Fetching data slice ${i + 1} of ${totalChunks}...`;
-                }
+                // Always update slice status text and progress bar
+                document.getElementById('loadingStatus').innerText = `Fetching data slice ${i + 1} of ${totalChunks}...`;
+                const startProgress = (i / totalChunks) * 100 + (1 / totalChunks) * 10;
+                progressBar.style.width = `${startProgress}%`;
 
                 for (const intervalIdx of intervalOrder) {
                     const interval = intervals[intervalIdx];
@@ -608,10 +606,9 @@
                             // Remember successful interval
                             preferredIntervalIndex = intervalIdx;
 
-                            if (totalChunks > 1) {
-                                const progress = ((i + 1) / totalChunks) * 100;
-                                progressBar.style.width = `${progress}%`;
-                            }
+                            const endProgress = ((i + 1) / totalChunks) * 100;
+                            progressBar.style.width = `${endProgress}%`;
+
                             break; // Successfully fetched this chunk
                         }
                     } catch (error) {
