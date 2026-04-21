@@ -2,6 +2,9 @@
 
 An interactive, self-contained web application for visualizing U.S. Dollar Index data with zoom and pan functionality, along with historical presidential term overlays.
 
+![U.S. Dollar Index Tracker Screenshot](docs/screenshot.png)
+*Figure 1: U.S. Dollar Index Tracker showing live data with presidential term overlays*
+
 ## Features
 
 - **Real-time DXY data**: Fetches data from Yahoo Finance via robust CORS proxies with multiple fallback mechanisms and intelligent "Smart Selection" to prioritize successful connection paths.
