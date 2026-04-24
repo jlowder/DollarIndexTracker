@@ -1,4 +1,4 @@
-<p align="center">
+<p>
   <a href="https://github.com/jlowder/DollarIndexTracker/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://raw.githubusercontent.com/jlowder/DollarIndexTracker/main/dollar_index_tracker.html"><img src="https://img.shields.io/badge/platform-Cross--Browser-green.svg" alt="Cross Browser Compatible"></a>
   <a href="https://github.com/jlowder/DollarIndexTracker"><img src="https://img.shields.io/badge/tech--stack-Vanilla%20JS-6f42c1.svg" alt="Vanilla JavaScript"></a>
