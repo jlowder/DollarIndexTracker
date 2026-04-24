@@ -1,16 +1,16 @@
-# U.S. Dollar Index (DXY) Interactive Chart
-
-An interactive, self-contained web application for visualizing U.S. Dollar Index data with zoom and pan functionality, along with historical presidential term overlays.
-
-![U.S. Dollar Index Tracker Screenshot](docs/screenshot.png)
-*Figure 1: U.S. Dollar Index Tracker showing live data with presidential term overlays*
-
 <p align="center">
   <a href="https://github.com/jlowder/DollarIndexTracker/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://raw.githubusercontent.com/jlowder/DollarIndexTracker/main/dollar_index_tracker.html"><img src="https://img.shields.io/badge/platform-Cross--Browser-green.svg" alt="Cross Browser Compatible"></a>
   <a href="https://github.com/jlowder/DollarIndexTracker"><img src="https://img.shields.io/badge/tech--stack-Vanilla%20JS-6f42c1.svg" alt="Vanilla JavaScript"></a>
   <a href="#"><img src="https://img.shields.io/badge/repo-DollarIndexTracker-orange.svg" alt="DollarIndexTracker Repository"></a>
 </p>
+
+# U.S. Dollar Index (DXY) Interactive Chart
+
+An interactive, self-contained web application for visualizing U.S. Dollar Index data with zoom and pan functionality, along with historical presidential term overlays.
+
+![U.S. Dollar Index Tracker Screenshot](docs/screenshot.png)
+*Figure 1: U.S. Dollar Index Tracker showing live data with presidential term overlays*
 
 ## Features
 
