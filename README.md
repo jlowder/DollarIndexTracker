@@ -1,9 +1,7 @@
-<p align="center">
-  [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jlowder/DollarIndexTracker/blob/main/LICENSE)
-  [![Cross Browser Compatible](https://img.shields.io/badge/platform-Cross--Browser-green.svg)](https://raw.githubusercontent.com/jlowder/DollarIndexTracker/main/dollar_index_tracker.html)
-  [![Vanilla JavaScript](https://img.shields.io/badge/tech--stack-Vanilla%20JS-6f42c1.svg)](https://github.com/jlowder/DollarIndexTracker)
-  [![DollarIndexTracker Repository](https://img.shields.io/badge/repo-DollarIndexTracker-orange.svg)](#)
-</p>
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jlowder/DollarIndexTracker/blob/main/LICENSE)
+[![Cross Browser Compatible](https://img.shields.io/badge/platform-Cross--Browser-green.svg)](https://raw.githubusercontent.com/jlowder/DollarIndexTracker/main/dollar_index_tracker.html)
+[![Vanilla JavaScript](https://img.shields.io/badge/tech--stack-Vanilla%20JS-6f42c1.svg)](https://github.com/jlowder/DollarIndexTracker)
+[![DollarIndexTracker Repository](https://img.shields.io/badge/repo-DollarIndexTracker-orange.svg)](#)
 
 # U.S. Dollar Index (DXY) Interactive Chart
 
